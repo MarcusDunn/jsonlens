@@ -53,6 +53,13 @@ dokka {
     }
 }
 
+// The Kotlin plugin adds kotlinSourcesJar, which writes the same file as sourcesJar of the Java plugin,
+// but with the sources under "main/". Whichever runs last wins, so the published sources JAR would
+// depend on the tasks of the build. The publication uses sourcesJar; turn the other one off.
+tasks.named("kotlinSourcesJar") {
+    enabled = false
+}
+
 tasks.named<Jar>("javadocJar") {
     from(tasks.named<org.jetbrains.dokka.gradle.tasks.DokkaGeneratePublicationTask>("dokkaGeneratePublicationHtml").flatMap { it.outputDirectory })
 }
