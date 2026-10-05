@@ -1,0 +1,1 @@
+$.values[?length(@.a)==length(value($..c))]

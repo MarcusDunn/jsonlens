@@ -1,0 +1,347 @@
+# Requirement catalog for jsonlens.
+#
+# Format: id | type | owner | statement
+#
+#   id         The section number of RFC 9535 (see spec/rfc9535.txt), a slash, and a short name.
+#              Rows that start with "lib/" are requirements of this library, not of the RFC.
+#   type       requirement  The implementation must do this. A test must cover it.
+#              option       The RFC permits a choice. The statement gives our decision. A test must cover it.
+#              declined     The RFC permits it, but we do not do it. The statement gives the reason. No test.
+#   owner      The Gradle project whose tests must cover the row, for example path-parser or patch.
+#   statement  What the test must show.
+#
+# A test refers to a row with @Requirement("<id>"). The "check" task of each module fails if a
+# test refers to an unknown id, or if a row that the module owns has no test.
+
+# ---------------------------------------------------------------------------------------------
+# Library requirements
+# ---------------------------------------------------------------------------------------------
+lib/core-dependencies               | requirement | path-core      | At runtime, the core module requires only java.base and the model module. JSpecify is a compile-time (static) requirement only.
+lib/parser-dependencies             | requirement | path-parser    | At runtime, the parser module requires only java.base and the core module. JSpecify is a compile-time (static) requirement only.
+lib/evaluator-dependencies          | requirement | path-evaluator | At runtime, the evaluator module requires only java.base and the core module. JSpecify is a compile-time (static) requirement only.
+lib/core-exception-free             | requirement | path-core      | With non-null arguments, no public operation of the core module throws an exception.
+lib/parser-exception-free           | requirement | path-parser    | With non-null arguments, the parser returns a value for all input. It does not throw an exception.
+lib/evaluator-exception-free        | requirement | path-evaluator | With non-null arguments and a well-formed JsonModel, the evaluator returns a value for all queries and JSON values. It does not throw an exception.
+lib/errors-as-values                | requirement | model     | Operations that can fail return a sealed Result of a value or an error record.
+lib/model-zero-copy                 | requirement | model     | A JsonModel gives access to the nodes of the caller's own JSON representation. It does not copy or convert them.
+lib/absence-as-values               | requirement | model     | A value that can be absent is a sealed Maybe (Some or None), not null and not Optional.
+lib/model-explicit-absence           | requirement | model     | A JsonModel reports a missing member or element as Maybe.None. JSON null is a present node of kind NULL.
+lib/model-defaults                   | requirement | model     | A JsonModel implements six methods: kind, arrayLength, element, memberCursor, stringValue, and numberValue. The other methods have defaults that use the six; memberCount, member, members, and hasDuplicate walk the member cursor.
+lib/model-equal-nodes                | requirement | model     | A JsonModel can make a new node object for each read of a value. Two reads of the same value give equal nodes with the same hash code. jsonlens does not compare nodes by reference.
+lib/model-no-null-arguments         | requirement | path-evaluator | The evaluator never calls a JsonModel method with a null argument.
+lib/model-kind-preconditions        | requirement | path-evaluator | The evaluator calls a kind-specific JsonModel method only for a node of that kind.
+lib/core-null-marked                | requirement | path-core      | All exported packages of the core module are @NullMarked (JSpecify). NullAway checks them at compile time.
+lib/model-dependencies              | requirement | model     | At runtime, the model module requires only java.base. JSpecify is a compile-time (static) requirement only.
+lib/model-null-marked               | requirement | model     | All exported packages of the model module are @NullMarked (JSpecify). NullAway checks them at compile time.
+lib/parser-null-marked              | requirement | path-parser    | All exported packages of the parser module are @NullMarked (JSpecify). NullAway checks them at compile time.
+lib/evaluator-null-marked           | requirement | path-evaluator | All exported packages of the evaluator module are @NullMarked (JSpecify). NullAway checks them at compile time.
+lib/no-json-types-in-api            | requirement | path-core      | The public API has no JSON value types. JSON values are always of the caller's type parameter N.
+lib/model-number-representation     | requirement | model     | The model chooses the representation of numbers. Each JsonNumber gives its exact value as a JsonDecimal, with no limit on the exponent; JsonNumber.of(...) makes the common cases.
+lib/model-number-comparison         | requirement | model     | The model compares numbers with JsonModel.compareNumbers. The default compares the exact values. Each implementation gives the same sign as the comparison of the exact values.
+lib/model-string-representation     | requirement | model     | The model chooses the representation of strings. A JsonString gives its Unicode scalar values in order; JsonString.of(String) makes the common case without a copy.
+lib/model-member-names              | requirement | path-core      | Member names are JsonStrings in the representation of the model. Equality and hash codes of properties and Normalized Paths use the scalar values, so names in different representations are equal.
+lib/model-factory                   | requirement | model     | A JsonFactory builds nodes of the model. The read methods give the exact value of each built node again.
+lib/model-equality-and-copy          | requirement | model     | JsonModel.equal compares two values as RFC 9535 and RFC 6902 define equality. JsonFactory.copyOf builds a deep copy of a value of any model. Neither uses recursion.
+lib/model-editor                    | requirement | model     | A JsonEditor changes objects and arrays in place. Each method returns the value that it replaced or removed, so that a caller can reverse the change.
+
+# ---------------------------------------------------------------------------------------------
+# 1. Introduction
+# ---------------------------------------------------------------------------------------------
+1.1/unicode-scalar-values      | requirement | path-parser    | A query is a sequence of Unicode scalar values. The parser rejects a query string that contains an unpaired surrogate.
+1.1/children                   | requirement | path-evaluator | The children of an array are its elements. The children of an object are its member values. A primitive value has no children.
+1.1/descendants                | requirement | path-evaluator | The descendants of a node are its children, the children of its children, and so on.
+1.1.1/member-names-not-nodes   | requirement | path-evaluator | Only member values are nodes. A query never selects a member name.
+1.3/json-value-kinds           | requirement | model     | A JsonModel classifies each node as one of the seven JSON kinds: object, array, number, string, true, false, null.
+1.3/duplicate-names            | option      | path-evaluator | The RFC does not define behavior for duplicate member names. Decision: the JsonModel decides which member value member() returns and which members members() returns.
+1.3/non-scalar-strings         | option      | path-core      | The RFC does not define behavior for strings that are not sequences of Unicode scalar values. Decision: a normalized path writes an unpaired surrogate in a member name without change.
+
+# ---------------------------------------------------------------------------------------------
+# 2.1 Overview
+# ---------------------------------------------------------------------------------------------
+2.1/utf8-encoding              | requirement | path-parser    | A query in bytes must be UTF-8. The parser rejects bytes that are not well-formed UTF-8.
+2.1/well-formed                | requirement | path-parser    | The parser rejects a query that does not agree with the ABNF grammar.
+2.1/ijson-integer-range        | requirement | path-parser    | The parser rejects an index, slice start, slice end, or slice step outside [-(2^53)+1, (2^53)-1].
+2.1/well-typed                 | requirement | path-parser    | The parser rejects a query with a function expression that is not well-typed.
+2.1/validity-independent-of-value | requirement | path-parser | The parser checks well-formedness and validity without a JSON value.
+2.1/no-validity-errors-at-evaluation | requirement | path-evaluator | The evaluator does not report well-formedness or validity errors for a parsed query.
+2.1/overflow-indication        | requirement | path-evaluator | When a JSON value is too large to process correctly, the evaluator gives an indication of overflow. It does not give a wrong result.
+2.1/diagnostics                | declined    | path-evaluator | The RFC suggests diagnostics for empty results. We do not supply them in the first version.
+
+# ---------------------------------------------------------------------------------------------
+# 2.1.1 Syntax and 2.1.2 Semantics
+# ---------------------------------------------------------------------------------------------
+2.1.1/root-then-segments       | requirement | path-parser    | A query is the root identifier followed by zero or more segments.
+2.1.1/blank-space              | requirement | path-parser    | Only space, horizontal tab, line feed, and carriage return are blank space. Blank space is permitted before each segment.
+2.1.1/no-outer-blank-space     | requirement | path-parser    | The parser rejects blank space before the root identifier and after the last segment.
+2.1.2/segment-sequence         | requirement | path-evaluator | Each segment operates on the nodelist that the previous segment (or the root identifier) produced.
+2.1.2/input-order              | requirement | path-evaluator | A segment concatenates its per-node results in the order of the input nodelist.
+2.1.2/duplicates-kept          | requirement | path-evaluator | A node that is selected more than once is in the result as many times. Duplicates are not removed.
+2.1.2/no-evaluation-errors     | requirement | path-evaluator | A valid segment never causes an error during evaluation. For example, an index outside the array selects nothing.
+2.1.2/empty-propagates         | requirement | path-evaluator | If a segment produces an empty nodelist, the query produces an empty nodelist.
+2.1.2/result-representation    | option      | path-evaluator | The RFC permits values, Normalized Paths, or both as the result. Decision: each result node has its value and its Normalized Path.
+2.1.3/example                  | requirement | path-evaluator | The example of Section 2.1.3 gives the documented result.
+
+# ---------------------------------------------------------------------------------------------
+# 2.2 Root identifier
+# ---------------------------------------------------------------------------------------------
+2.2.1/root-identifier          | requirement | path-parser    | A query must start with the root identifier "$".
+2.2.2/root-node                | requirement | path-evaluator | The root identifier produces a nodelist with only the root node.
+2.2.3/examples                 | requirement | path-evaluator | The queries of Table 3 give the documented results.
+
+# ---------------------------------------------------------------------------------------------
+# 2.3 Selectors
+# ---------------------------------------------------------------------------------------------
+2.3/selector-kinds             | requirement | path-parser    | A selector is a name, wildcard, slice, index, or filter selector.
+
+# 2.3.1 Name selector
+2.3.1.1/quotes                 | requirement | path-parser    | A string literal is enclosed in single quotes or double quotes.
+2.3.1.1/unescaped              | requirement | path-parser    | A string literal can contain the unescaped characters of the grammar. The parser rejects an unescaped control character U+0000 to U+001F.
+2.3.1.1/own-quote-escaped      | requirement | path-parser    | In a string literal, the enclosing quote character must be escaped. The other quote character can be escaped only in its own kind of literal.
+2.3.1.1/escapes                | requirement | path-parser    | The escapes \b \f \n \r \t \/ \\ and \uXXXX are permitted. The parser rejects all other escapes.
+2.3.1.1/surrogate-pairs        | requirement | path-parser    | A high-surrogate \u escape must be followed by a low-surrogate \u escape. The parser rejects an unpaired surrogate escape.
+2.3.1.1/hex-case               | requirement | path-parser    | Hexadecimal digits in a \u escape can be uppercase or lowercase. The "u" must be lowercase.
+2.3.1.2/escape-replacement     | requirement | path-parser    | The parser replaces each escape sequence with its character as in Table 4.
+2.3.1.2/select-member          | requirement | path-evaluator | A name selector selects the member value of an object whose name is equal to the selector name, or nothing.
+2.3.1.2/non-object             | requirement | path-evaluator | A name selector selects nothing from a value that is not an object.
+2.3.1.2/no-normalization       | requirement | path-evaluator | Names are equal only if they are identical sequences of Unicode scalar values. No Unicode normalization occurs.
+2.3.1.3/examples               | requirement | path-evaluator | The queries of Table 5 give the documented results.
+
+# 2.3.2 Wildcard selector
+2.3.2.1/syntax                 | requirement | path-parser    | The wildcard selector is "*".
+2.3.2.2/all-children           | requirement | path-evaluator | A wildcard selector selects all children of an object or array.
+2.3.2.2/array-order            | requirement | path-evaluator | A wildcard selector selects array elements in array order.
+2.3.2.2/object-order           | option      | path-evaluator | The RFC does not specify the order of object children. Decision: the order of JsonModel.members().
+2.3.2.2/primitive              | requirement | path-evaluator | A wildcard selector selects nothing from a primitive value.
+2.3.2.3/examples               | requirement | path-evaluator | The queries of Table 6 give the documented results.
+
+# 2.3.3 Index selector
+2.3.3.1/int-syntax             | requirement | path-parser    | An index is "0" or an optional "-" followed by a non-zero digit and more digits. The parser rejects leading zeros, "-0", and "+".
+2.3.3.1/ijson-range            | requirement | path-parser    | The parser rejects an index outside the I-JSON range.
+2.3.3.2/non-negative           | requirement | path-evaluator | A non-negative index selects the array element at that zero-based position.
+2.3.3.2/negative               | requirement | path-evaluator | A negative index selects the element at the array length plus the index.
+2.3.3.2/out-of-range           | requirement | path-evaluator | An index outside the array selects nothing and is not an error.
+2.3.3.2/non-array              | requirement | path-evaluator | An index selector selects nothing from a value that is not an array.
+2.3.3.3/examples               | requirement | path-evaluator | The queries of Table 7 give the documented results.
+
+# 2.3.4 Array slice selector
+2.3.4.1/syntax                 | requirement | path-parser    | A slice is [start S] ":" S [end S] [":" [S step]]. All three integers are optional.
+2.3.4.1/ijson-range            | requirement | path-parser    | The parser rejects a slice integer outside the I-JSON range.
+2.3.4.2.2/non-array            | requirement | path-evaluator | A slice selects nothing from a value that is not an array.
+2.3.4.2.2/defaults             | requirement | path-evaluator | The default step is 1. The default start and end depend on the sign of step as in Table 8.
+2.3.4.2.2/bounds               | requirement | path-evaluator | The evaluator normalizes start and end and calculates the bounds as the functions Normalize and Bounds specify.
+2.3.4.2.2/positive-step        | requirement | path-evaluator | A positive step selects from the lower bound up to, but not including, the upper bound.
+2.3.4.2.2/negative-step        | requirement | path-evaluator | A negative step selects from the upper bound down to, but not including, the lower bound.
+2.3.4.2.2/zero-step            | requirement | path-evaluator | A step of 0 selects nothing.
+2.3.4.3/examples               | requirement | path-evaluator | The queries of Table 9 give the documented results.
+
+# 2.3.5 Filter selector
+2.3.5/children                 | requirement | path-evaluator | A filter selector evaluates its logical expression once for each child. The child is the current node.
+2.3.5.1/syntax                 | requirement | path-parser    | A filter selector is "?" followed by optional blank space and a logical expression.
+2.3.5.1/current-node           | requirement | path-evaluator | "@" refers to the current node of the filter selector that directly encloses it.
+2.3.5.1/evaluation-order       | option      | path-evaluator | The RFC permits short-circuit or full evaluation of && and ||. Decision: short-circuit evaluation.
+2.3.5.1/logical-operators      | requirement | path-evaluator | ||, &&, and ! have the semantics of Boolean algebra.
+2.3.5.1/precedence             | requirement | path-parser    | Operator precedence is as in Table 10: grouping and functions, then !, then relations, then &&, then ||.
+2.3.5.1/parentheses            | requirement | path-parser    | Parentheses can group a logical expression. A parenthesized expression can have a "!" before it.
+2.3.5.1/test-expr              | requirement | path-parser    | A test expression is an optional "!" followed by a filter query or a function expression. The parser rejects a literal as a test expression.
+2.3.5.1/filter-query           | requirement | path-parser    | A filter query is a relative query (starts with "@") or an absolute query (starts with "$").
+2.3.5.1/comparable             | requirement | path-parser    | Each side of a comparison is a literal, a singular query, or a function expression. The parser rejects a non-singular query in a comparison.
+2.3.5.1/singular-query         | requirement | path-parser    | A singular query has only name segments and index segments, each with one selector.
+2.3.5.1/comparison-operators   | requirement | path-parser    | The comparison operators are == != <= >= < and >.
+2.3.5.1/literals               | requirement | path-parser    | A literal is a number, a string, true, false, or null. true, false, and null are lowercase only.
+2.3.5.1/number-syntax          | requirement | path-parser    | A number literal is (int / "-0") [frac] [exp]. The exponent marker can be "e" or "E".
+2.3.5.2/structured-only        | requirement | path-evaluator | A filter selector selects nothing from a primitive value.
+2.3.5.2/array-order            | requirement | path-evaluator | A filter selector selects array elements in array order.
+2.3.5.2/object-order           | option      | path-evaluator | The RFC does not specify the order of object children. Decision: the order of JsonModel.members().
+2.3.5.2.1/existence            | requirement | path-evaluator | A query used as a test is true if it selects at least one node, else false.
+2.3.5.2.2/empty-equality       | requirement | path-evaluator | When one side of == is an empty nodelist or Nothing, the result is true only if the other side is also empty or Nothing.
+2.3.5.2.2/empty-less-than      | requirement | path-evaluator | When one side of < is an empty nodelist or Nothing, the result is false.
+2.3.5.2.2/number-equality      | requirement | path-evaluator | Numbers in the I-JSON range are equal if they are mathematically equal, for example 1 and 1.0.
+2.3.5.2.2/number-ordering      | requirement | path-evaluator | Numbers in the I-JSON range compare in their mathematical order.
+2.3.5.2.2/non-interoperable-numbers | option | path-evaluator | Equality and order of numbers outside I-JSON are implementation-specific. Decision: compare the exact values of the JsonNumbers that the model gives, as for I-JSON numbers. Each JSON number has an exact value, so each comparison is exact, also with a very large exponent.
+2.3.5.2.2/primitive-equality   | requirement | path-evaluator | Strings, true, false, and null are equal only to the same primitive value.
+2.3.5.2.2/array-equality       | requirement | path-evaluator | Arrays are equal if they have the same length and the elements at each position are equal.
+2.3.5.2.2/object-equality      | requirement | path-evaluator | Objects are equal if they have the same names and the values for each name are equal.
+2.3.5.2.2/kind-mismatch        | requirement | path-evaluator | Values of different kinds are never equal. For example, 1 == "1" and null == false are false.
+2.3.5.2.2/string-ordering      | requirement | path-evaluator | Strings compare by Unicode scalar values, not by UTF-16 code units.
+2.3.5.2.2/less-than-kinds      | requirement | path-evaluator | < is false unless both sides are numbers or both sides are strings.
+2.3.5.2.2/derived-operators    | requirement | path-evaluator | !=, <=, >, and >= are defined from == and < as the RFC specifies.
+2.3.5.3/examples               | requirement | path-evaluator | The queries of Table 12 give the documented results.
+
+# ---------------------------------------------------------------------------------------------
+# 2.4 Function extensions
+# ---------------------------------------------------------------------------------------------
+2.4/side-effect-free           | requirement | path-evaluator | The built-in functions have no side effects. The same query and value always give the same result.
+2.4/function-name              | requirement | path-parser    | A function name starts with a lowercase letter, followed by lowercase letters, digits, and "_".
+2.4/function-expr              | requirement | path-parser    | A function expression is a name, "(", zero or more comma-separated arguments, and ")". There is no blank space between the name and "(".
+2.4/function-arguments         | requirement | path-parser    | A function argument is a literal, a filter query, a logical expression, or a function expression.
+2.4/unknown-function           | requirement | path-parser    | The parser rejects a call to a function that is not registered.
+2.4/extension-signatures       | option      | path-parser    | The RFC lets implementations register more functions. Decision: the parser accepts more function signatures from the caller.
+2.4/extension-implementations  | option      | path-evaluator | The RFC lets implementations register more functions. Decision: read-only extensions (no ValueType parameters) run with each model; building extensions run only with a model that also implements JsonFactory.
+2.4.1/declared-types           | requirement | path-parser    | Each parameter and each result of a function has a declared type: ValueType, LogicalType, or NodesType.
+2.4.1/nothing                  | requirement | path-evaluator | Nothing is distinct from all JSON values, including null.
+2.4.1/logical-not-boolean      | requirement | path-parser    | LogicalType is not a JSON boolean. The parser rejects a LogicalType function in a comparison.
+2.4.2/nodes-to-logical         | requirement | path-evaluator | A NodesType result converts to LogicalTrue if it is not empty, else to LogicalFalse.
+2.4.2/no-nodes-to-value        | requirement | path-parser    | There is no implicit conversion from NodesType to ValueType.
+2.4.3/test-expr-context        | requirement | path-parser    | A function in a test expression must have the result type LogicalType or NodesType.
+2.4.3/comparable-context       | requirement | path-parser    | A function in a comparison must have the result type ValueType.
+2.4.3/argument-context         | requirement | path-parser    | Each argument must agree with the declared type of its parameter as Section 2.4.3 specifies.
+2.4.3/arity                    | requirement | path-parser    | The parser rejects a function call with the wrong number of arguments.
+2.4.4/signature                | requirement | path-parser    | length() has one ValueType parameter and the result type ValueType.
+2.4.4/string                   | requirement | path-evaluator | length() of a string is its number of Unicode scalar values.
+2.4.4/array                    | requirement | path-evaluator | length() of an array is its number of elements.
+2.4.4/object                   | requirement | path-evaluator | length() of an object is its number of members.
+2.4.4/other                    | requirement | path-evaluator | length() of any other value, or of Nothing, is Nothing.
+2.4.5/signature                | requirement | path-parser    | count() has one NodesType parameter and the result type ValueType.
+2.4.5/count                    | requirement | path-evaluator | count() is the number of nodes in the nodelist, with duplicates.
+2.4.6/signature                | requirement | path-parser    | match() has two ValueType parameters and the result type LogicalType.
+2.4.6/full-match               | requirement | path-evaluator | match() is LogicalTrue if the complete string matches the I-Regexp.
+2.4.6/non-string               | requirement | path-evaluator | match() is LogicalFalse if an argument is not a string.
+2.4.6/invalid-iregexp          | requirement | path-evaluator | match() is LogicalFalse if the second argument is not a valid I-Regexp (RFC 9485).
+2.4.6/iregexp-semantics        | requirement | path-evaluator | The evaluator applies I-Regexp semantics (RFC 9485), not the semantics of java.util.regex. For example, "." does not match "\n" or "\r".
+2.4.7/signature                | requirement | path-parser    | search() has two ValueType parameters and the result type LogicalType.
+2.4.7/substring                | requirement | path-evaluator | search() is LogicalTrue if a substring of the string matches the I-Regexp.
+2.4.7/non-string               | requirement | path-evaluator | search() is LogicalFalse if an argument is not a string.
+2.4.7/invalid-iregexp          | requirement | path-evaluator | search() is LogicalFalse if the second argument is not a valid I-Regexp (RFC 9485).
+2.4.8/signature                | requirement | path-parser    | value() has one NodesType parameter and the result type ValueType.
+2.4.8/single-node              | requirement | path-evaluator | value() of a nodelist with one node is the value of the node.
+2.4.8/not-single               | requirement | path-evaluator | value() of an empty nodelist or of a nodelist with more than one node is Nothing.
+2.4.9/examples                 | requirement | path-parser    | The queries of Table 14 are well-typed or not well-typed as documented.
+
+# ---------------------------------------------------------------------------------------------
+# 2.5 Segments
+# ---------------------------------------------------------------------------------------------
+2.5/segment-kinds              | requirement | path-parser    | A segment is a child segment or a descendant segment.
+2.5.1.1/bracketed-selection    | requirement | path-parser    | A bracketed selection is "[", one or more comma-separated selectors, and "]". Blank space is permitted around the selectors.
+2.5.1.1/dot-wildcard           | requirement | path-parser    | ".*" is shorthand for "[*]".
+2.5.1.1/member-name-shorthand  | requirement | path-parser    | ".name" is shorthand for "['name']". The name starts with ALPHA, "_", or a non-ASCII scalar value, and continues with these or DIGIT.
+2.5.1.1/no-blank-after-dot     | requirement | path-parser    | The parser rejects blank space between "." and the name or "*".
+2.5.1.2/selector-order         | requirement | path-evaluator | A child segment concatenates the results of its selectors in the order of the selectors.
+2.5.1.3/examples               | requirement | path-evaluator | The queries of Table 15 give the documented results.
+2.5.2.1/syntax                 | requirement | path-parser    | A descendant segment is ".." followed by a bracketed selection, "*", or a member name shorthand, with no blank space between them.
+2.5.2.1/bare-double-dot        | requirement | path-parser    | The parser rejects ".." that is not followed by a selection.
+2.5.2.2/visit-order            | requirement | path-evaluator | A descendant segment visits a node before its descendants, and array elements in array order.
+2.5.2.2/object-order           | option      | path-evaluator | The RFC does not specify the order in which object children are visited. Decision: the order of JsonModel.members().
+2.5.2.2/concatenation          | requirement | path-evaluator | The result is the concatenation of the child segment results for each visited node, in visit order.
+2.5.2.3/examples               | requirement | path-evaluator | The queries of Table 16 give the documented results.
+
+# ---------------------------------------------------------------------------------------------
+# 2.6 Semantics of null
+# ---------------------------------------------------------------------------------------------
+2.6/null-is-value              | requirement | path-evaluator | JSON null is a value like all other values. It does not mean "missing".
+2.6.1/examples                 | requirement | path-evaluator | The queries of Table 17 give the documented results.
+
+# ---------------------------------------------------------------------------------------------
+# 2.7 Normalized Paths
+# ---------------------------------------------------------------------------------------------
+2.7/bracket-notation           | requirement | path-core      | A Normalized Path is "$" followed by bracket segments. A name uses single quotes. An index is a non-negative decimal integer without leading zeros.
+2.7/escaping                   | requirement | path-core      | A name escapes \b \f \n \r \t ' and \ with a backslash, and other characters U+0000 to U+001F as \u00xx with lowercase hex. It does not escape other characters.
+2.7/unique                     | requirement | path-evaluator | The evaluator gives each result node the one Normalized Path of its location. A negative index becomes the equivalent non-negative index.
+2.7/identity                   | requirement | path-core      | Two Normalized Paths are equal only if they identify the same location.
+2.7.1/examples                 | requirement | path-core      | The Normalized Paths of Table 18 have the documented text.
+
+# ---------------------------------------------------------------------------------------------
+# 3. IANA considerations
+# ---------------------------------------------------------------------------------------------
+3.1/media-type                 | declined    | path-core      | The media type application/jsonpath is for transport. The library does not transport queries.
+3.2/registry                   | requirement | path-parser    | The parser registers the functions of the IANA subregistry: length, count, match, search, and value.
+
+# ---------------------------------------------------------------------------------------------
+# 4. Security considerations
+# ---------------------------------------------------------------------------------------------
+4.1/no-eval                    | requirement | path-parser    | The parser implements the full grammar itself. It does not use a script engine.
+4.1/parser-resources           | requirement | path-parser    | Deeply nested queries give an error value, not a stack overflow.
+4.1/evaluator-resources        | requirement | path-evaluator | Deeply nested JSON values do not cause a stack overflow during evaluation.
+4.1/regex-resources            | requirement | path-evaluator | match() and search() do not use excessive time for an I-Regexp that causes catastrophic backtracking in java.util.regex.
+4.2/query-construction         | option      | path-parser    | The RFC recommends safe construction of queries from variables. Decision: a parsed query can write itself as query text with all names escaped.
+
+# ---------------------------------------------------------------------------------------------
+# JsonModel adapters
+# ---------------------------------------------------------------------------------------------
+lib/jackson-contract           | requirement | jackson   | JacksonJsonModel passes the JsonModel contract tests.
+lib/jackson-dependencies       | requirement | jackson   | At runtime, the jackson module requires only the model module and Jackson 3 databind.
+lib/jackson-non-json-nodes     | option      | jackson   | A Jackson tree can hold values that are not JSON. Decision: NaN and infinite numbers, binary, and POJO nodes are strings with their text. A POJO that holds null and a missing node are null.
+lib/jackson-stream-contract    | requirement | jackson   | The model of JacksonStream passes the JsonModel contract tests.
+lib/jackson-stream-on-demand   | requirement | jackson   | JacksonStream reads the tokens of a Jackson parser only when a query needs them, and keeps each value that it has read. It keeps duplicate names and exact numbers.
+lib/jackson-stream-errors      | requirement | jackson   | A parser error during a query ends the document there and is kept in failure(); open and readFully give errors as values.
+lib/kotlinx-contract           | requirement | kotlinx-serialization | KotlinxJsonModel passes the JsonModel contract tests.
+lib/kotlinx-dependencies       | requirement | kotlinx-serialization | At runtime, the kotlinx-serialization module requires only the model module, kotlinx.serialization JSON, and the Kotlin standard library.
+lib/kotlinx-object-model       | requirement | kotlinx-serialization | KotlinxObjectModel reads Kotlin objects through their serializers, one level at a time. Its view is the JSON of Json.encodeToJsonElement with the same Json instance, in each configuration.
+lib/kotlinx-non-json-literals  | option      | kotlinx-serialization | A JsonPrimitive can hold a literal that is not JSON, for example NaN. Decision: such a primitive is a string with its text.
+lib/mapped-dependencies        | requirement | mapped    | At runtime, the mapped module requires only java.base and the model module. JSpecify is a compile-time (static) requirement only.
+lib/mapped-null-marked         | requirement | mapped    | All exported packages of the mapped module are @NullMarked (JSpecify).
+lib/mapped-contract            | requirement | mapped    | The model of MappedJson passes the JsonModel contract tests.
+lib/mapped-no-copies           | requirement | mapped    | MappedJson does not copy the bytes. Strings and numbers are read from the bytes only when the caller reads them, and member lookup compares the name bytes without a decoded copy.
+lib/mapped-errors-as-values    | requirement | mapped    | MappedJson reports bytes that are not a JSON text in UTF-8, and files that cannot be read, as error values. It does not throw an exception for a non-null argument.
+lib/mapped-rfc8259             | requirement | mapped    | MappedJson accepts exactly the JSON texts of RFC 8259 in well-formed UTF-8 (RFC 3629).
+lib/mapped-deep-nesting        | requirement | mapped    | Deeply nested JSON texts do not cause a stack overflow.
+lib/mapped-number-exact        | requirement | mapped    | Each JSON number has the kind NUMBER and its exact value, also with an exponent that a BigDecimal cannot hold.
+lib/mapped-size-limit          | requirement | mapped    | A file larger than 2 GiB gives an error value.
+lib/mapped-duplicate-names     | option      | mapped    | RFC 8259 does not define the meaning of duplicate member names. Decision: member() gives the first member with the name, and members() gives all members in document order.
+
+# ---------------------------------------------------------------------------------------------
+# JSONPath Compliance Test Suite (spec/cts)
+# ---------------------------------------------------------------------------------------------
+lib/cts-parser                 | requirement | path-parser    | The parser accepts each valid selector of the JSONPath Compliance Test Suite and rejects each invalid selector.
+lib/cts-evaluator              | requirement | path-evaluator | For each valid case of the JSONPath Compliance Test Suite, the evaluator gives the documented values and Normalized Paths, with the Jackson and kotlinx models, and the documented paths with the memory-mapped model.
+
+# ---------------------------------------------------------------------------------------------
+# RFC 9485 (I-Regexp), for match() and search()
+# ---------------------------------------------------------------------------------------------
+rfc9485-3/checking             | requirement | path-evaluator | The I-Regexp implementation is checking. A regexp that does not agree with RFC 9485, Figure 1 is not valid, including "[^]", a reversed range, and a reversed quantifier.
+rfc9485-3/unicode              | requirement | path-evaluator | The I-Regexp implementation supports all Unicode scalar values, and the category escapes \p{..} and \P{..}.
+rfc9485-4/xsd-semantics        | requirement | path-evaluator | The I-Regexp implementation has XSD semantics: for example, "." does not match "\n" or "\r", and match() requires a match of the complete string.
+rfc9485-4/anchors              | option      | path-evaluator | In XSD, "^" and "$" are ordinary characters, but the JSONPath Compliance Test Suite and the mappings of RFC 9485, Section 5 make them anchors. Decision: outside a character class, "^" matches only at the start and "$" only at the end of the input.
+rfc9485-8/range-quantifiers    | option      | path-evaluator | RFC 9485 lets an implementation limit range quantifiers. Decision: a regexp with a program larger than the limit, or with more than 256 nested groups, gives the overflow indication RegexTooComplex.
+
+# ---------------------------------------------------------------------------------------------
+# RFC 6901: JSON Pointer (spec/rfc6901.txt). The pointer module owns these rows.
+# ---------------------------------------------------------------------------------------------
+rfc6901-3/syntax               | requirement | pointer   | A pointer is empty, or "/" followed by reference tokens separated by "/". Text that is not empty and does not start with "/" is an error.
+rfc6901-3/escaping             | requirement | pointer   | "~0" encodes "~" and "~1" encodes "/" in a token. A "~" that is not followed by "0" or "1" is an error. Writing a pointer escapes "~" and "/".
+rfc6901-3/characters           | requirement | pointer   | A pointer is a string of characters. A token can hold any character other than an unescaped "/" or "~", for example non-ASCII characters and U+0000 (also Section 8).
+rfc6901-4/decode-order         | requirement | pointer   | Decoding gives "~1" for "~01": "~1" becomes "/" and then "~0" becomes "~", never the reverse.
+rfc6901-4/object-member        | requirement | pointer   | For an object, a token selects the member with the same Unicode code points. There is no Unicode normalization.
+rfc6901-4/duplicate-names      | requirement | pointer   | If the selected member name is not unique in the object, the evaluation fails.
+rfc6901-4/array-index          | requirement | pointer   | For an array, a token is "0" or digits without a leading zero, and selects the element at that zero-based index. Other tokens are errors.
+rfc6901-4/dash                 | requirement | pointer   | The token "-" references the nonexistent element after the last element, so the evaluation fails. An application of JSON Pointer (JSON Patch) defines its use.
+rfc6901-4/unresolved           | requirement | pointer   | The evaluation fails if a token does not resolve to a value: a missing member, an index outside the array, or a token after a value that is not an object or an array.
+rfc6901-5/json-string          | requirement | pointer   | The pointers of the example in Section 5 select the documented values.
+rfc6901-6/uri-fragment         | requirement | pointer   | The URI fragment form is "#" and the UTF-8 bytes of the pointer, with percent-encoding for each byte that a fragment does not permit. The fragments of Section 6 select the documented values.
+rfc6901-7/errors               | requirement | pointer   | Each error condition is a PointerError value that tells the cause. The library does not throw.
+lib/pointer-model-agnostic     | requirement | pointer   | A pointer resolves against the values of any JsonModel (Jackson, kotlinx, mapped, Java collections), and gives the caller's own node without a copy.
+lib/pointer-dependencies       | requirement | pointer   | At runtime, the pointer module requires only java.base and the model module.
+lib/pointer-null-marked        | requirement | pointer   | All exported packages of the pointer module are @NullMarked (JSpecify).
+
+# ---------------------------------------------------------------------------------------------
+# RFC 6902: JSON Patch (spec/rfc6902.txt). The patch module owns these rows.
+# ---------------------------------------------------------------------------------------------
+rfc6902-3/document             | requirement | patch     | A patch document is an array of operation objects. Another document is an error.
+rfc6902-3/sequential           | requirement | patch     | The operations apply in order. Each operation applies to the result of the previous operation.
+rfc6902-4/op-member            | requirement | patch     | Each operation has exactly one "op" member, a string with one of the six operation names. Other values, a missing "op", and two "op" members are errors.
+rfc6902-4/path-member          | requirement | patch     | Each operation has exactly one "path" member, a string with a JSON Pointer.
+rfc6902-4/operation-members    | requirement | patch     | add, replace, and test need a "value" member; move and copy need a "from" member with a JSON Pointer.
+rfc6902-4/ignore-members       | requirement | patch     | Members that an operation does not define are ignored.
+rfc6902-4.1/add                | requirement | patch     | add replaces the whole document, adds or replaces an object member, or inserts an array element and shifts the next elements. "-" appends.
+rfc6902-4.1/add-errors         | requirement | patch     | For add, the parent of the target location must exist and be a container, and an array index must not be greater than the length.
+rfc6902-4.2/remove             | requirement | patch     | remove removes the value at the target location, which must exist. Array elements after it shift to the left.
+rfc6902-4.2/remove-root        | option      | patch     | RFC 6902 does not define a remove of the whole document. Decision: it is the error RootRemoved, because the document cannot be absent.
+rfc6902-4.3/replace            | requirement | patch     | replace replaces the value at the target location, which must exist.
+rfc6902-4.4/move               | requirement | patch     | move removes the value at "from" and adds it at the target location, which is evaluated after the removal. A move to the same location has no effect, but "from" must exist.
+rfc6902-4.4/move-errors        | requirement | patch     | The "from" location of move must exist, and must not be a proper prefix of the target location.
+rfc6902-4.5/copy               | requirement | patch     | copy adds a copy of the value at "from", which must exist, at the target location.
+rfc6902-4.6/test               | requirement | patch     | test succeeds only if the values have the same JSON type and are equal: strings by code points, numbers by value, arrays in order, objects without order, and literals.
+rfc6902-5/atomic               | requirement | patch     | If an operation fails, the patch is not successful and the document has its original value again (the HTTP PATCH method is atomic). Only the order of members in an object can differ, because it is not significant (RFC 8259, Section 4).
+rfc6902-5/errors               | requirement | patch     | Each error is a PatchError value with the index of its operation. The library does not throw.
+rfc6902-6/media-type           | declined    | patch     | The media type application/json-patch+json is for transport. The library does not transport patch documents.
+lib/patch-test-suite           | requirement | patch     | Each enabled record of the JSON Patch test suite gives its expected result or an error, on the Jackson and Java collections models, with the patch document in Jackson, kotlinx, and mapped.
+lib/patch-model-agnostic       | requirement | patch     | A patch document can be in any JsonModel, and a target in any model that is also a JsonFactory and a JsonEditor.
+lib/patch-minimal-copies       | requirement | patch     | move and test build no node. add and replace copy their value once. copy makes one deep copy. remove builds no node.
+lib/patch-copy                 | requirement | patch     | applyToCopy applies a patch with only a JsonModel and a JsonFactory (for example kotlinx). The document never changes. Each change builds only the containers on its path; all other nodes are shared, and copy shares its source.
+lib/patch-dependencies         | requirement | patch     | At runtime, the patch module requires only java.base, the model module, and the pointer module.
+lib/patch-null-marked          | requirement | patch     | All exported packages of the patch module are @NullMarked (JSpecify).
+lib/testkit-dependencies       | requirement | model-testkit | At runtime, the model-testkit module requires the model, core, mapped, parser, evaluator, and patch modules, and JUnit Jupiter. JSpecify is a compile-time (static) requirement only.
+lib/testkit-null-marked        | requirement | model-testkit | All exported packages of the model-testkit module are @NullMarked (JSpecify).
+lib/testkit-verifier           | requirement | model-testkit | ModelVerifier checks each rule of the JsonModel contract on each value of a document, and returns each violation as a value. An override of a default method must give the result of the default method.
+lib/testkit-contracts          | requirement | model-testkit | The contract classes run fixed cases and ModelVerifier on random documents as JUnit tests. They fail for a model that breaks a rule.
+lib/testkit-suites             | requirement | model-testkit | ComplianceKit runs the JSONPath Compliance Test Suite and the JSON Patch test suite on any model, as JUnit dynamic tests.
+lib/testkit-random-json        | requirement | model-testkit | RandomJson makes valid JSON texts from a seed. The same seed gives the same texts.

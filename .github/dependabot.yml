@@ -1,0 +1,12 @@
+# Keeps the pinned actions and the Gradle dependencies up to date. A pull request runs CI, and
+# Gradle dependency verification fails until gradle/verification-metadata.xml has the new entries.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly

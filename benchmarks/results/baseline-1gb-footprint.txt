@@ -1,0 +1,2 @@
+model       file MB    after load MB    after walk MB
+mapped         1000           2520.3           4655.5

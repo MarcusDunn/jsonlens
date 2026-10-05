@@ -1,0 +1,4 @@
+model       file MB    after load MB    after walk MB
+jackson         100            756.0            780.2
+kotlinx         100           1301.6           1325.7
+mapped          100            282.1            499.6

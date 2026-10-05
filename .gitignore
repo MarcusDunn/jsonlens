@@ -1,0 +1,16 @@
+.gradle/
+.kotlin/
+build/
+.direnv/
+.idea/
+*.iml
+out/
+.claude/settings.local.json
+.claude/worktrees/
+.cifuzz-corpus/
+
+# Gradle dependency verification reads the readable keyring (verification-keyring.keys).
+gradle/verification-keyring.gpg
+
+# The CI signing key. It goes into a GitHub secret, never into git.
+ci-signing-subkey.asc

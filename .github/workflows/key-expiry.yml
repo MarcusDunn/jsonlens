@@ -1,0 +1,54 @@
+# Checks each week that the release signing key, as the Web Key Directory of marcusdunn.ca gives
+# it, is valid for at least 90 more days. If it is not, or if the lookup fails, the workflow opens
+# an issue (one at a time) and fails. The README section "Extend the release key" tells what to do.
+name: Release key
+
+on:
+  schedule:
+    - cron: "17 9 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: release-key
+  cancel-in-progress: true
+
+jobs:
+  expiry:
+    name: Check the expiry of the release key
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      issues: write # Opens an issue before the key expires.
+    env:
+      KEY_EMAIL: marcus@marcusdunn.ca
+      WARN_DAYS: "90"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check the key, and open an issue for a problem
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          GNUPGHOME="$(mktemp -d)"
+          export GNUPGHOME
+          if ! gpg --batch --auto-key-locate clear,wkd,nodefault --locate-external-keys "${KEY_EMAIL}"; then
+            problem="The Web Key Directory of marcusdunn.ca does not give the key of ${KEY_EMAIL}."
+          elif ! days="$(.github/scripts/signing-key-days.sh "${KEY_EMAIL}")"; then
+            problem="The key of ${KEY_EMAIL} has no valid signing key."
+          elif [ "${days}" != never ] && [ "${days}" -lt "${WARN_DAYS}" ]; then
+            problem="The signing key of ${KEY_EMAIL} expires in ${days} days."
+          else
+            echo "The signing key of ${KEY_EMAIL} is valid for ${days} more days."
+            exit 0
+          fi
+          title="The release signing key needs attention"
+          open="$(gh issue list --state open --search "in:title \"${title}\"" --json number --jq length)"
+          if [ "${open}" = 0 ]; then
+            gh issue create --title "${title}" --body "${problem} See \"Extend the release key\" in the README."
+          fi
+          echo "${problem}" >&2
+          exit 1
