@@ -52,6 +52,8 @@ tasks.withType<Javadoc>().configureEach {
         addStringOption("-snippet-path", snippets.asFile.path)
         // No date in the pages, so that the javadoc JAR is reproducible.
         addBooleanOption("notimestamp", true)
+        // Colors the code in snippets and code blocks (JDK 23 and later).
+        addBooleanOption("-syntax-highlight", true)
     }
 }
 
@@ -60,6 +62,8 @@ tasks.withType<Javadoc>().configureEach {
 tasks.withType<AbstractArchiveTask>().configureEach {
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
+    // A folder that is empty in one checkout (git does not track folders) must not change the archive.
+    includeEmptyDirs = false
     filePermissions { unix("rw-r--r--") }
     dirPermissions { unix("rwxr-xr-x") }
 }
