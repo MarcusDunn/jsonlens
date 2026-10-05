@@ -190,17 +190,23 @@ internal class ElementSource(private val model: KotlinxObjectModel, private val 
 /**
  * The JSON view of a node: a scalar with its JSON text, an array, or an object.
  *
- * @property text the text of a scalar as Json writes it, for example a map key
+ * @param fixedText the text of a scalar, or `null` for a number whose text comes from [original]
+ * @param original the Kotlin value of a number that has no fixed text: a `Long`, `Int`, `Short`,
+ *     `Byte`, `Double`, or `Float`, whose `toString` is the text that Json writes
  */
 internal class Shape(
     val kind: JsonKind,
-    val text: String,
+    private val fixedText: String?,
     val number: JsonNumber,
     val elements: List<KotlinxNode> = listOf(),
     val members: Map<String, KotlinxNode> = mapOf(),
+    private val original: Any? = null,
 ) : ShapeSource() {
     /** A shape is its own shape. */
     override fun resolve(): Shape = this
+
+    /** The text of a scalar as Json writes it, for example as a map key. A number makes it only on request. */
+    val text: String get() = fixedText ?: original.toString()
 
     /** The value of a string scalar. It is made when a reader asks for it, not for each scalar. */
     val string: JsonString get() = JsonString.of(text)
@@ -211,6 +217,9 @@ internal class Shape(
         fun scalar(kind: JsonKind, text: String): Shape = Shape(kind, text, ZERO)
 
         fun number(value: JsonNumber, text: String): Shape = Shape(JsonKind.NUMBER, text, value)
+
+        /** A number whose text is the `toString` of its Kotlin value, made only for a map key. */
+        fun numberOf(value: JsonNumber, original: Any): Shape = Shape(JsonKind.NUMBER, null, value, original = original)
 
         fun arrayOf(elements: List<KotlinxNode>): Shape = Shape(JsonKind.ARRAY, "", ZERO, elements)
 
@@ -239,8 +248,9 @@ internal class LevelEncoder(private val model: KotlinxObjectModel) : AbstractEnc
     private var unsigned = false
     private var tooComplex = false
     private var scalar: Shape? = null
-    private val elements = ArrayList<KotlinxNode>()
-    private val members = LinkedHashMap<String, KotlinxNode>()
+    // Made in beginStructure for the kind of the structure. A scalar needs neither.
+    private var elements: MutableList<KotlinxNode> = java.util.Collections.emptyList()
+    private var members: MutableMap<String, KotlinxNode> = java.util.Collections.emptyMap()
     private var expectingKey = true
     private var key = ""
 
@@ -258,6 +268,11 @@ internal class LevelEncoder(private val model: KotlinxObjectModel) : AbstractEnc
         }
         structured = true
         structure = descriptor
+        if (descriptor.kind == StructureKind.LIST) {
+            elements = ArrayList()
+        } else {
+            members = LinkedHashMap()
+        }
         return this
     }
 
@@ -344,7 +359,9 @@ internal class LevelEncoder(private val model: KotlinxObjectModel) : AbstractEnc
         }
     }
 
-    private fun integer(value: Long, original: Any) = add(Shape.number(JsonNumber.of(value), value.toString()), original)
+    /** An integer. The original of an unsigned value is signed, so its text is made now. */
+    private fun integer(value: Long, original: Any) =
+        add(if (unsigned) Shape.number(JsonNumber.of(value), value.toString()) else Shape.numberOf(JsonNumber.of(value), original), original)
 
     /**
      * A floating-point value. Json writes `Double.toString`, and the exact value of a
@@ -352,10 +369,9 @@ internal class LevelEncoder(private val model: KotlinxObjectModel) : AbstractEnc
      * NaN and the infinities are not JSON numbers: Json writes them as these words.
      */
     private fun decimal(value: Double, original: Any) {
-        val text = value.toString()
         when (val number = JsonNumber.of(value)) {
-            is Maybe.Some -> add(Shape.number(number.value(), text), original)
-            is Maybe.None -> add(Shape.scalar(JsonKind.STRING, text), original)
+            is Maybe.Some -> add(Shape.numberOf(number.value(), original), original)
+            is Maybe.None -> add(Shape.scalar(JsonKind.STRING, original.toString()), original)
         }
     }
 
@@ -363,7 +379,7 @@ internal class LevelEncoder(private val model: KotlinxObjectModel) : AbstractEnc
     private fun add(shape: Shape, original: Any?) {
         unsigned = false
         if (structured) {
-            addNode(KotlinxNode(original, shape), shape.text)
+            addNode(KotlinxNode(original, shape), if (structure.kind == StructureKind.MAP && expectingKey) shape.text else "")
         } else {
             scalar = shape
         }
