@@ -4,7 +4,7 @@
 
 `jsonlens` implements several RFCs with a JSON library agnostic core, it has a focus on correctness and minimal copies.
 
-API documentation: <https://jsonlens.marcusdunn.ca>
+API documentation: <https://jsonlens.marcusdunn.ca> (Kotlin: <https://jsonlens.marcusdunn.ca/kotlinx/>). For coding agents: <https://jsonlens.marcusdunn.ca/llms.txt>.
 
 ## Implemented RFCs
 
