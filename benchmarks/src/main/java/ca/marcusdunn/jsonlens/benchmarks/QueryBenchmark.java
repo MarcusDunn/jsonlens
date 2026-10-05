@@ -48,7 +48,7 @@ public class QueryBenchmark {
             // One value: the cost that does not depend on the size.
             "index", "$.items[-1].id");
 
-    @Param({"jackson", "kotlinx", "mapped"})
+    @Param({"jackson", "kotlinx", "kotlinxObjects", "mapped"})
     public String model;
 
     @Param({"descendant", "wildcard", "filterNumber", "filterString", "filterMatch", "index"})

@@ -8,6 +8,9 @@ import net.ltgt.gradle.errorprone.errorprone
 
 plugins {
     id("jsonlens.java-conventions")
+    // Kotlin objects for the benchmarks of KotlinxObjectModel.
+    id("jsonlens.kotlin-jvm")
+    id("jsonlens.kotlin-serialization")
 }
 
 description = "JMH benchmarks of jsonlens with large JSON files. It is not published."

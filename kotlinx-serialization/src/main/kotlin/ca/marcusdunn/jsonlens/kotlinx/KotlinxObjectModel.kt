@@ -65,7 +65,7 @@ public class KotlinxObjectModel(public val json: Json = Json) : JsonModel<Kotlin
     public fun <T> node(value: T, serializer: SerializationStrategy<T>): KotlinxNode {
         @Suppress("UNCHECKED_CAST")
         val strategy = serializer as SerializationStrategy<Any?>
-        return KotlinxNode(value) { capture(strategy, value) }
+        return KotlinxNode(value, Capture(this, strategy, value))
     }
 
     override fun kind(node: KotlinxNode): JsonKind = node.shape().kind
@@ -118,9 +118,9 @@ public class KotlinxObjectModel(public val json: Json = Json) : JsonModel<Kotlin
     /** The shape of a [JsonElement]: the view of a part that the model reads through [json]. */
     internal fun elementShape(element: JsonElement): Shape = when (element) {
         is JsonObject -> Shape.objectOf(element.entries.associateTo(LinkedHashMap()) { (name, child) ->
-            name to KotlinxNode(child) { elementShape(child) }
+            name to KotlinxNode(child, ElementSource(this, child))
         })
-        is JsonArray -> Shape.arrayOf(element.map { child -> KotlinxNode(child) { elementShape(child) } })
+        is JsonArray -> Shape.arrayOf(element.map { child -> KotlinxNode(child, ElementSource(this, child)) })
         else -> {
             val primitive = element as JsonPrimitive
             Shape(KotlinxJsonModel.kind(primitive), primitive.content, KotlinxJsonModel.numberValue(primitive))
@@ -141,15 +141,50 @@ public class KotlinxObjectModel(public val json: Json = Json) : JsonModel<Kotlin
  * @property value your own value: an object, a list, a map, a primitive, or `null`. Inside a part
  *     that the model reads through `Json.encodeToJsonElement`, the value of a node is its [JsonElement].
  */
-public class KotlinxNode internal constructor(public val value: Any?, private val source: () -> Shape) {
+public class KotlinxNode internal constructor(public val value: Any?, source: ShapeSource) {
 
-    private var cached: Shape? = null
+    /** The [Shape] of the node, or the source that makes it. A read of a known shape takes no lock. */
+    @Volatile
+    private var state: ShapeSource = source
 
     /** The JSON view of the node, made once, on the first visit. The children are the same nodes each time. */
+    internal fun shape(): Shape {
+        val known = state
+        return if (known is Shape) known else capture()
+    }
+
+    /**
+     * Makes the shape under the lock, so that two threads that visit the node get the same
+     * children. If another thread made the shape after the read in [shape], [state] is that
+     * shape, and it resolves to itself.
+     */
     @Synchronized
-    internal fun shape(): Shape = cached ?: source().also { cached = it }
+    private fun capture(): Shape {
+        val shape = state.resolve()
+        state = shape
+        return shape
+    }
 
     override fun toString(): String = "KotlinxNode[$value]"
+}
+
+/** A [Shape], or what makes the shape of a node on its first visit. */
+internal abstract class ShapeSource {
+    abstract fun resolve(): Shape
+}
+
+/** The shape of a value of your object tree: its serializer writes its direct children. */
+internal class Capture(
+    private val model: KotlinxObjectModel,
+    private val serializer: SerializationStrategy<Any?>,
+    private val value: Any?,
+) : ShapeSource() {
+    override fun resolve(): Shape = model.capture(serializer, value)
+}
+
+/** The shape of a [JsonElement]: the view of a part that the model reads through Json. */
+internal class ElementSource(private val model: KotlinxObjectModel, private val element: JsonElement) : ShapeSource() {
+    override fun resolve(): Shape = model.elementShape(element)
 }
 
 /**
@@ -163,8 +198,12 @@ internal class Shape(
     val number: JsonNumber,
     val elements: List<KotlinxNode> = listOf(),
     val members: Map<String, KotlinxNode> = mapOf(),
-) {
-    val string: JsonString = JsonString.of(text)
+) : ShapeSource() {
+    /** A shape is its own shape. */
+    override fun resolve(): Shape = this
+
+    /** The value of a string scalar. It is made when a reader asks for it, not for each scalar. */
+    val string: JsonString get() = JsonString.of(text)
 
     companion object {
         private val ZERO: JsonNumber = JsonNumber.of(0)
@@ -260,9 +299,10 @@ internal class LevelEncoder(private val model: KotlinxObjectModel) : AbstractEnc
         }
     }
 
-    override fun encodeFloat(value: Float) = decimal(value.toString(), value)
+    // Float.toString has at most 9 significant digits, so its double has the same shortest text.
+    override fun encodeFloat(value: Float) = decimal(value.toString().toDouble(), value)
 
-    override fun encodeDouble(value: Double) = decimal(value.toString(), value)
+    override fun encodeDouble(value: Double) = decimal(value, value)
 
     override fun encodeChar(value: Char) = add(Shape.scalar(JsonKind.STRING, value.toString()), value)
 
@@ -285,7 +325,7 @@ internal class LevelEncoder(private val model: KotlinxObjectModel) : AbstractEnc
         val strategy = serializer as SerializationStrategy<Any?>
         val kind = strategy.descriptor.kind
         if (value is JsonElement) {
-            addNode(KotlinxNode(value) { model.elementShape(value) }, "")
+            addNode(KotlinxNode(value, ElementSource(model, value)), "")
         } else if (kind is PrimitiveKind || kind == SerialKind.ENUM || strategy.descriptor.isInline) {
             // A scalar, an enum, or a value class: capture it now, also for a map key.
             val child = LevelEncoder(model)
@@ -300,19 +340,22 @@ internal class LevelEncoder(private val model: KotlinxObjectModel) : AbstractEnc
             // A structured map key: only Json can write it (allowStructuredMapKeys).
             tooComplex = true
         } else {
-            addNode(KotlinxNode(value) { model.capture(strategy, value) }, "")
+            addNode(KotlinxNode(value, Capture(model, strategy, value)), "")
         }
     }
 
     private fun integer(value: Long, original: Any) = add(Shape.number(JsonNumber.of(value), value.toString()), original)
 
-    private fun decimal(text: String, original: Any) {
-        // NaN and the infinities are not JSON numbers. Json writes them as these words.
-        val exact = JsonDecimal.parse(text)
-        if (exact is Maybe.Some<JsonDecimal>) {
-            add(Shape.number(JsonNumber.of(exact.value()), text), original)
-        } else {
-            add(Shape.scalar(JsonKind.STRING, text), original)
+    /**
+     * A floating-point value. Json writes `Double.toString`, and the exact value of a
+     * `JsonNumber.of(double)` is that same decimal, so the number compares without a conversion.
+     * NaN and the infinities are not JSON numbers: Json writes them as these words.
+     */
+    private fun decimal(value: Double, original: Any) {
+        val text = value.toString()
+        when (val number = JsonNumber.of(value)) {
+            is Maybe.Some -> add(Shape.number(number.value(), text), original)
+            is Maybe.None -> add(Shape.scalar(JsonKind.STRING, text), original)
         }
     }
 
@@ -320,7 +363,7 @@ internal class LevelEncoder(private val model: KotlinxObjectModel) : AbstractEnc
     private fun add(shape: Shape, original: Any?) {
         unsigned = false
         if (structured) {
-            addNode(KotlinxNode(original) { shape }, shape.text)
+            addNode(KotlinxNode(original, shape), shape.text)
         } else {
             scalar = shape
         }

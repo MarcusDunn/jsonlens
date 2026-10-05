@@ -8,6 +8,8 @@ import ca.marcusdunn.jsonlens.path.evaluator.JsonPathEvaluator;
 import ca.marcusdunn.jsonlens.path.evaluator.Node;
 import ca.marcusdunn.jsonlens.jackson.JacksonJsonModel;
 import ca.marcusdunn.jsonlens.kotlinx.KotlinxJsonModel;
+import ca.marcusdunn.jsonlens.kotlinx.KotlinxNode;
+import ca.marcusdunn.jsonlens.kotlinx.KotlinxObjectModel;
 import ca.marcusdunn.jsonlens.mapped.MappedJson;
 import ca.marcusdunn.jsonlens.mapped.MappedJsonError;
 import java.io.BufferedInputStream;
@@ -17,18 +19,19 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.function.Supplier;
 import kotlinx.serialization.json.Json;
 import kotlinx.serialization.json.JsonElement;
 import kotlinx.serialization.json.JvmStreamsKt;
 import tools.jackson.databind.json.JsonMapper;
 
-/// The three models of the benchmarks, and how each one reads a file.
+/// The models of the benchmarks, and how each one reads a file.
 enum Model {
     /// Jackson 3 with the default mapper: a number with a fraction is a `double`.
     JACKSON {
         @Override
         Loaded<?> load(Path file) {
-            return new Loaded<>(JsonMapper.builder().build().readTree(file.toFile()), JacksonJsonModel.INSTANCE);
+            return Loaded.of(JsonMapper.builder().build().readTree(file.toFile()), JacksonJsonModel.INSTANCE);
         }
     },
     /// kotlinx.serialization, read from a stream, so the text is never one large `String`.
@@ -37,7 +40,22 @@ enum Model {
         Loaded<?> load(Path file) {
             try (InputStream in = new BufferedInputStream(Files.newInputStream(file), 1 << 16)) {
                 JsonElement root = JvmStreamsKt.decodeFromStream(Json.Default, JsonElement.Companion.serializer(), in);
-                return new Loaded<>(root, KotlinxJsonModel.INSTANCE);
+                return Loaded.of(root, KotlinxJsonModel.INSTANCE);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+    },
+    /// Kotlin objects through their serializers ([KotlinxObjectModel]). The load decodes the file
+    /// into [Items] once. Each evaluation starts from a new root node, so it includes the capture
+    /// of each level that the query visits, as for an object that a program queries one time.
+    KOTLINXOBJECTS {
+        @Override
+        Loaded<?> load(Path file) {
+            try (InputStream in = new BufferedInputStream(Files.newInputStream(file), 1 << 16)) {
+                Items items = JvmStreamsKt.decodeFromStream(Json.Default, Items.Companion.serializer(), in);
+                KotlinxObjectModel model = new KotlinxObjectModel(Json.Default);
+                return new Loaded<KotlinxNode>(() -> model.node(items, Items.Companion.serializer()), model);
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -48,7 +66,7 @@ enum Model {
         @Override
         Loaded<?> load(Path file) {
             return switch (MappedJson.open(file)) {
-                case Result.Ok<MappedJson, MappedJsonError>(MappedJson json) -> new Loaded<>(json.root(), json.model());
+                case Result.Ok<MappedJson, MappedJsonError>(MappedJson json) -> Loaded.of(json.root(), json.model());
                 case Result.Err<MappedJson, MappedJsonError>(MappedJsonError error) ->
                         throw new IllegalStateException(error.message());
             };
@@ -61,10 +79,19 @@ enum Model {
         return valueOf(name.toUpperCase(java.util.Locale.ROOT));
     }
 
-    /// A loaded document and its model.
-    record Loaded<N>(N root, JsonModel<N> model) {
+    /// A loaded document and its model. [#root()] gives the root node of an evaluation: the same
+    /// node each time, or a new one for a model that caches what a query visits.
+    record Loaded<N>(Supplier<N> roots, JsonModel<N> model) {
+        static <N> Loaded<N> of(N root, JsonModel<N> model) {
+            return new Loaded<>(() -> root, model);
+        }
+
+        N root() {
+            return roots.get();
+        }
+
         List<Node<N>> evaluate(JsonPathEvaluator evaluator, JsonPathQuery query) {
-            return switch (evaluator.evaluate(query, root, model)) {
+            return switch (evaluator.evaluate(query, root(), model)) {
                 case Result.Ok<List<Node<N>>, EvaluationError>(List<Node<N>> nodes) -> nodes;
                 case Result.Err<List<Node<N>>, EvaluationError>(EvaluationError error) ->
                         throw new IllegalStateException(error.message());
