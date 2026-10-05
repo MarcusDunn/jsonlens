@@ -1,0 +1,57 @@
+# Publishes the API documentation of a release to GitHub Pages, at https://jsonlens.marcusdunn.ca.
+#
+# A tag v<version> runs it, as for the release. To publish the documentation of an existing tag,
+# run it by hand on that tag: gh workflow run docs.yml --ref v<version>
+#
+# The site has the Javadoc of all Java modules together (with the overview page and the links
+# between the modules), and the Dokka pages of the Kotlin module under /kotlinx/.
+name: Docs
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build the API documentation
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check that gradle-wrapper.jar is the official JAR
+        uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+      - name: Build the Javadoc and the Dokka pages
+        run: nix develop --command ./gradlew :docs:javadocAll :kotlinx-serialization:dokkaGeneratePublicationHtml
+      - name: Put the site together
+        run: |
+          mkdir site
+          cp -r build/docs/javadoc/. site/
+          cp -r kotlinx-serialization/build/dokka/html site/kotlinx
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write # Deploys the site.
+      id-token: write # GitHub Pages checks the OIDC identity of this workflow.
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
