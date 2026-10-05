@@ -89,6 +89,8 @@ abstract class AggregateJavadoc @Inject constructor(
             "--release", release.get().toString(),
             "-Xdoclint:all", "-Werror",
             "-quiet",
+            "-notimestamp",
+            "--syntax-highlight",
             "-encoding", "UTF-8",
             "-doctitle", title.get(),
             "-windowtitle", title.get(),
