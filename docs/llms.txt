@@ -1,0 +1,54 @@
+# jsonlens
+
+> jsonlens reads, queries, and changes JSON values in the representation of any JSON library, for Java 21+ and Kotlin. It implements JSONPath (RFC 9535), JSON Pointer (RFC 6901), and JSON Patch (RFC 6902) on one interface, `JsonModel`, so the values stay in your library's own types (Jackson `JsonNode`, kotlinx `JsonElement`, Kotlin objects, `Map`/`List`, memory-mapped bytes). No method throws for a well-formed model: each operation returns a sealed `Result` of a value or a sealed error record.
+
+Maven group `ca.marcusdunn.jsonlens`, version `@VERSION@`. Use the BOM `ca.marcusdunn.jsonlens:jsonlens-bom:@VERSION@` and add only the modules you need. All library modules are JPMS modules. The sources JARs on Maven Central have the full documentation as Markdown comments.
+
+Rules to know:
+
+- Errors are values. `Result<V, E>` is `Result.Ok` or `Result.Err`; `Maybe<T>` is `Maybe.Some` or `Maybe.None`; each error type is a sealed interface of records. Use an exhaustive `switch` (Java) or `when` (Kotlin, no `else` needed).
+- Kotlin cannot destructure the Java records: use the accessors, for example `ok.value()` and `err.error()`.
+- A `JsonModel<N>` needs six methods: `kind`, `arrayLength`, `element`, `memberCursor`, `stringValue`, `numberValue`. The rest have defaults. Test a model with `jsonlens-model-testkit`.
+- Numbers are exact: `JsonNumber.exactValue()` is a `JsonDecimal` with no limit on the exponent.
+
+Example (Jackson):
+
+```java
+JsonPathQuery query = switch (JsonPathParser.standard().parse("$.store.book[?@.price < 10].title")) {
+    case Result.Ok(var value) -> value;
+    case Result.Err(var error) -> throw new IllegalArgumentException(error.message());
+};
+switch (JsonPathEvaluator.standard().evaluate(query, root, JacksonJsonModel.INSTANCE)) {
+    case Result.Ok(var nodes) -> nodes.forEach(node -> System.out.println(node.path() + " = " + node.value()));
+    case Result.Err(var error) -> System.err.println(error.message());
+}
+```
+
+## Modules
+
+- [jsonlens-model](https://jsonlens.marcusdunn.ca/ca.marcusdunn.jsonlens.model/module-summary.html): `JsonModel`, `JsonFactory`, `JsonEditor`, `JsonString`, `JsonNumber`, `Result`, `Maybe`. No dependencies.
+- [jsonlens-path-parser](https://jsonlens.marcusdunn.ca/ca.marcusdunn.jsonlens.path.parser/module-summary.html): `JsonPathParser.standard().parse(String)` gives a validated `JsonPathQuery`.
+- [jsonlens-path-evaluator](https://jsonlens.marcusdunn.ca/ca.marcusdunn.jsonlens.path.evaluator/module-summary.html): `JsonPathEvaluator.standard().evaluate(query, root, model)` gives `List<Node<N>>`, each with the value and its Normalized Path.
+- [jsonlens-path-core](https://jsonlens.marcusdunn.ca/ca.marcusdunn.jsonlens.path.core/module-summary.html): the query syntax tree and `NormalizedPath`.
+- [jsonlens-pointer](https://jsonlens.marcusdunn.ca/ca.marcusdunn.jsonlens.pointer/module-summary.html): `JsonPointer.parse(String)`, then `pointer.resolve(root, model)`.
+- [jsonlens-patch](https://jsonlens.marcusdunn.ca/ca.marcusdunn.jsonlens.patch/module-summary.html): `JsonPatch.parse(patchDocument, model)`, then `patch.apply(document, model)` (in place, atomic) or `patch.applyToCopy(document, model)` (for immutable trees).
+- [jsonlens-jackson](https://jsonlens.marcusdunn.ca/ca.marcusdunn.jsonlens.jackson/module-summary.html): `JacksonJsonModel.INSTANCE` for Jackson 3 trees; `JacksonStream.open(parser)` reads a streaming parser on demand.
+- [jsonlens-mapped](https://jsonlens.marcusdunn.ca/ca.marcusdunn.jsonlens.mapped/module-summary.html): `MappedJson.open(path)` indexes a UTF-8 file without copies; use `json.root()` and `json.model()`.
+- [jsonlens-kotlinx-serialization](https://jsonlens.marcusdunn.ca/kotlinx/index.html) (Kotlin): `KotlinxJsonModel` for `JsonElement` trees; `KotlinxObjectModel(json).node(value, serializer)` for `@Serializable` objects.
+- [jsonlens-model-testkit](https://jsonlens.marcusdunn.ca/ca.marcusdunn.jsonlens.testkit/module-summary.html): `JsonModelContract` (extend it in a JUnit test), `ModelVerifier.of(model).verify(root)`, and `ComplianceKit` with the RFC test suites.
+
+## Key types
+
+- [JsonModel](https://jsonlens.marcusdunn.ca/ca.marcusdunn.jsonlens.model/ca/marcusdunn/jsonlens/model/JsonModel.html): the contract of a model, its required and default methods.
+- [Result](https://jsonlens.marcusdunn.ca/ca.marcusdunn.jsonlens.model/ca/marcusdunn/jsonlens/model/Result.html) and [Maybe](https://jsonlens.marcusdunn.ca/ca.marcusdunn.jsonlens.model/ca/marcusdunn/jsonlens/model/Maybe.html)
+- [JsonPathParser](https://jsonlens.marcusdunn.ca/ca.marcusdunn.jsonlens.path.parser/ca/marcusdunn/jsonlens/path/parser/JsonPathParser.html) and [ParseError](https://jsonlens.marcusdunn.ca/ca.marcusdunn.jsonlens.path.parser/ca/marcusdunn/jsonlens/path/parser/ParseError.html)
+- [JsonPathEvaluator](https://jsonlens.marcusdunn.ca/ca.marcusdunn.jsonlens.path.evaluator/ca/marcusdunn/jsonlens/path/evaluator/JsonPathEvaluator.html) and [EvaluationError](https://jsonlens.marcusdunn.ca/ca.marcusdunn.jsonlens.path.evaluator/ca/marcusdunn/jsonlens/path/evaluator/EvaluationError.html)
+- [JsonPointer](https://jsonlens.marcusdunn.ca/ca.marcusdunn.jsonlens.pointer/ca/marcusdunn/jsonlens/pointer/JsonPointer.html) and [PointerError](https://jsonlens.marcusdunn.ca/ca.marcusdunn.jsonlens.pointer/ca/marcusdunn/jsonlens/pointer/PointerError.html)
+- [JsonPatch](https://jsonlens.marcusdunn.ca/ca.marcusdunn.jsonlens.patch/ca/marcusdunn/jsonlens/patch/JsonPatch.html) and [PatchError](https://jsonlens.marcusdunn.ca/ca.marcusdunn.jsonlens.patch/ca/marcusdunn/jsonlens/patch/PatchError.html)
+- [KotlinxObjectModel](https://jsonlens.marcusdunn.ca/kotlinx/jsonlens-kotlinx-serialization/ca.marcusdunn.jsonlens.kotlinx/-kotlinx-object-model/index.html) and [KotlinxJsonModel](https://jsonlens.marcusdunn.ca/kotlinx/jsonlens-kotlinx-serialization/ca.marcusdunn.jsonlens.kotlinx/-kotlinx-json-model/index.html)
+
+## Optional
+
+- [Overview of the API documentation](https://jsonlens.marcusdunn.ca/index.html)
+- [Source code, with the examples as tested code in docs/src/test/java](https://github.com/MarcusDunn/jsonlens)
+- [How to verify a release (signature, provenance, rebuild, SBOM)](https://github.com/MarcusDunn/jsonlens/blob/main/SECURITY.md)

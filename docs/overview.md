@@ -30,15 +30,15 @@ steps:
 | [ca.marcusdunn.jsonlens.path.core] | The query syntax tree and [ca.marcusdunn.jsonlens.path.core.path.NormalizedPath] | model |
 | [ca.marcusdunn.jsonlens.path.parser] | [ca.marcusdunn.jsonlens.path.parser.JsonPathParser]: query text to a validated query | path-core |
 | [ca.marcusdunn.jsonlens.path.evaluator] | [ca.marcusdunn.jsonlens.path.evaluator.JsonPathEvaluator]: applies a query to a JSON value | path-core |
-| [ca.marcusdunn.jsonlens.jackson] | [ca.marcusdunn.jsonlens.jackson.JacksonJsonModel] for Jackson 3 `JsonNode` | model, Jackson databind |
+| [ca.marcusdunn.jsonlens.jackson] | [ca.marcusdunn.jsonlens.jackson.JacksonJsonModel] for Jackson 3 `JsonNode`, and [ca.marcusdunn.jsonlens.jackson.JacksonStream] for streaming parsers | model, Jackson databind |
 | [ca.marcusdunn.jsonlens.mapped] | [ca.marcusdunn.jsonlens.mapped.MappedJson]: a read-only model over UTF-8 bytes | model |
 | [ca.marcusdunn.jsonlens.pointer] | [ca.marcusdunn.jsonlens.pointer.JsonPointer]: RFC 6901 JSON Pointer for the values of any model | model |
 | [ca.marcusdunn.jsonlens.patch] | [ca.marcusdunn.jsonlens.patch.JsonPatch]: RFC 6902 JSON Patch, applied in place to any editable model | model, pointer |
 | [ca.marcusdunn.jsonlens.testkit] | Tests for your own model: [ca.marcusdunn.jsonlens.testkit.JsonModelContract], [ca.marcusdunn.jsonlens.testkit.ModelVerifier], and [ca.marcusdunn.jsonlens.testkit.ComplianceKit]. Use it only in tests. | model, path-core, mapped, path-parser, path-evaluator, patch, JUnit Jupiter |
+| [jsonlens-kotlinx-serialization](kotlinx/index.html) (Kotlin) | `KotlinxJsonModel` for kotlinx.serialization `JsonElement` trees, and `KotlinxObjectModel` for `@Serializable` Kotlin objects | model, kotlinx.serialization, Kotlin |
 
-The Kotlin module `jsonlens-kotlinx-serialization` has models for kotlinx.serialization `JsonElement`
-trees and `@Serializable` Kotlin objects. Javadoc cannot read Kotlin, so it is not in this
-documentation: see its [Dokka pages](kotlinx/index.html). Its javadoc JAR has the same pages.
+Javadoc cannot read Kotlin, so the Kotlin module has its own [Dokka pages](kotlinx/index.html).
+Its javadoc JAR has the same pages.
 
 Use only the modules that you need. A validation library can use only the parser. An engine with its
 own parser can use only the evaluator.

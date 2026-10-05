@@ -4,7 +4,7 @@
 # run it by hand on that tag: gh workflow run docs.yml --ref v<version>
 #
 # The site has the Javadoc of all Java modules together (with the overview page and the links
-# between the modules), and the Dokka pages of the Kotlin module under /kotlinx/.
+# between the modules), the Dokka pages of the Kotlin module under /kotlinx/, and /llms.txt.
 name: Docs
 
 on:
@@ -28,6 +28,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The tags give the version in llms.txt.
+          fetch-depth: 0
       - name: Check that gradle-wrapper.jar is the official JAR
         uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
@@ -38,6 +40,9 @@ jobs:
           mkdir site
           cp -r build/docs/javadoc/. site/
           cp -r kotlinx-serialization/build/dokka/html site/kotlinx
+          # llms.txt: a map of the documentation for coding agents, with the newest released version.
+          version="$(git tag --list "v*" --sort=-v:refname | head -n 1)"
+          sed "s/@VERSION@/${version#v}/g" docs/llms.txt > site/llms.txt
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: site
