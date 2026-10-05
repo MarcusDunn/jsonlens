@@ -1,6 +1,7 @@
 # Checks each week that the release signing key, as the Web Key Directory of marcusdunn.ca gives
 # it, is valid for at least 90 more days. If it is not, or if the lookup fails, the workflow opens
-# an issue (one at a time) and fails. The README section "Extend the release key" tells what to do.
+# an issue (one at a time) and fails. The section "Extend the release key" of RELEASING.md tells
+# what to do.
 name: Release key
 
 on:
@@ -48,7 +49,7 @@ jobs:
           title="The release signing key needs attention"
           open="$(gh issue list --state open --search "in:title \"${title}\"" --json number --jq length)"
           if [ "${open}" = 0 ]; then
-            gh issue create --title "${title}" --body "${problem} See \"Extend the release key\" in the README."
+            gh issue create --title "${title}" --body "${problem} See \"Extend the release key\" in RELEASING.md."
           fi
           echo "${problem}" >&2
           exit 1
