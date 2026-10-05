@@ -38,7 +38,7 @@ steps:
 
 The Kotlin module `jsonlens-kotlinx-serialization` has models for kotlinx.serialization `JsonElement`
 trees and `@Serializable` Kotlin objects. Javadoc cannot read Kotlin, so it is not in this
-documentation: its javadoc JAR has its Dokka pages.
+documentation: see its [Dokka pages](kotlinx/index.html). Its javadoc JAR has the same pages.
 
 Use only the modules that you need. A validation library can use only the parser. An engine with its
 own parser can use only the evaluator.

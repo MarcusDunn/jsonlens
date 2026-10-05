@@ -4,6 +4,8 @@
 
 `jsonlens` implements several RFCs with a JSON library agnostic core, it has a focus on correctness and minimal copies.
 
+API documentation: <https://jsonlens.marcusdunn.ca>
+
 ## Implemented RFCs
 
 - JSONPath, [RFC 9535](https://www.rfc-editor.org/info/rfc9535): queries;
