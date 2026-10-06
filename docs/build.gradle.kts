@@ -21,6 +21,7 @@ dependencies {
     testImplementation(projects.mapped)
     testImplementation(projects.pointer)
     testImplementation(projects.patch)
+    testImplementation(projects.mergePatch)
     testImplementation(projects.modelTestkit)
 }
 
@@ -55,6 +56,7 @@ val documentedModules = mapOf(
     "ca.marcusdunn.jsonlens.mapped" to "mapped",
     "ca.marcusdunn.jsonlens.pointer" to "pointer",
     "ca.marcusdunn.jsonlens.patch" to "patch",
+    "ca.marcusdunn.jsonlens.mergepatch" to "merge-patch",
     "ca.marcusdunn.jsonlens.testkit" to "model-testkit",
 )
 

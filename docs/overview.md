@@ -1,7 +1,8 @@
 jsonlens reads, queries, and changes JSON values in the representation of any JSON library. It
 implements JSONPath ([RFC 9535](https://www.rfc-editor.org/rfc/rfc9535)), JSON Pointer
-([RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)), and JSON Patch
-([RFC 6902](https://www.rfc-editor.org/rfc/rfc6902)) for one model of JSON values.
+([RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)), JSON Patch
+([RFC 6902](https://www.rfc-editor.org/rfc/rfc6902)), and JSON Merge Patch
+([RFC 7396](https://www.rfc-editor.org/rfc/rfc7396)) for one model of JSON values.
 
 - **No JSON library binding.** You give jsonlens a [ca.marcusdunn.jsonlens.model.JsonModel]
   for your JSON type. It reads your values directly. It does not copy or convert them, and the
@@ -9,7 +10,7 @@ implements JSONPath ([RFC 9535](https://www.rfc-editor.org/rfc/rfc9535)), JSON P
 - **No exceptions.** Operations return a sealed [ca.marcusdunn.jsonlens.model.Result]: a value or an
   error record. You examine it with a `switch` and record patterns.
 - **No runtime dependencies.** The JSpecify nullness annotations are necessary only at compile time.
-- **Traceable.** Each requirement of the three RFCs has a test. The build fails when a requirement has
+- **Traceable.** Each requirement of the four RFCs has a test. The build fails when a requirement has
   no test.
 
 ## Quick start
@@ -34,6 +35,7 @@ steps:
 | [ca.marcusdunn.jsonlens.mapped] | [ca.marcusdunn.jsonlens.mapped.MappedJson]: a read-only model over UTF-8 bytes | model |
 | [ca.marcusdunn.jsonlens.pointer] | [ca.marcusdunn.jsonlens.pointer.JsonPointer]: RFC 6901 JSON Pointer for the values of any model | model |
 | [ca.marcusdunn.jsonlens.patch] | [ca.marcusdunn.jsonlens.patch.JsonPatch]: RFC 6902 JSON Patch, applied in place to any editable model | model, pointer |
+| [ca.marcusdunn.jsonlens.mergepatch] | [ca.marcusdunn.jsonlens.mergepatch.JsonMergePatch]: RFC 7396 JSON Merge Patch, merged in place into any editable model, or into a copy | model |
 | [ca.marcusdunn.jsonlens.testkit] | Tests for your own model: [ca.marcusdunn.jsonlens.testkit.JsonModelContract], [ca.marcusdunn.jsonlens.testkit.ModelVerifier], and [ca.marcusdunn.jsonlens.testkit.ComplianceKit]. Use it only in tests. | model, path-core, mapped, path-parser, path-evaluator, patch, JUnit Jupiter |
 | [jsonlens-kotlinx-serialization](kotlinx/index.html) (Kotlin) | `KotlinxJsonModel` for kotlinx.serialization `JsonElement` trees | model, kotlinx.serialization, Kotlin |
 
