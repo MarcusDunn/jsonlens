@@ -1,6 +1,5 @@
 /**
- * jsonlens models for kotlinx.serialization: {@code KotlinxJsonModel} for {@code JsonElement} trees,
- * and {@code KotlinxObjectModel} for {@code @Serializable} Kotlin objects.
+ * A jsonlens model for kotlinx.serialization: {@code KotlinxJsonModel} for {@code JsonElement} trees.
  *
  * <p>At runtime, this module requires the model module, kotlinx.serialization JSON, and the Kotlin
  * standard library.

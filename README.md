@@ -21,7 +21,7 @@ API documentation: <https://jsonlens.marcusdunn.ca> (Kotlin: <https://jsonlens.m
 | `jsonlens-path-parser` | `JsonPathParser`: query text to a validated `JsonPathQuery` | path-core |
 | `jsonlens-path-evaluator` | `JsonPathEvaluator`: applies a `JsonPathQuery` to a JSON value | path-core |
 | `jsonlens-jackson` | `JacksonJsonModel` for Jackson 3 `JsonNode` trees, and `JacksonStream` for Jackson streaming parsers | model, Jackson databind |
-| `jsonlens-kotlinx-serialization` | `KotlinxJsonModel` for kotlinx.serialization `JsonElement`, and `KotlinxObjectModel` for `@Serializable` Kotlin objects | model, kotlinx.serialization, Kotlin |
+| `jsonlens-kotlinx-serialization` | `KotlinxJsonModel` for kotlinx.serialization `JsonElement` trees | model, kotlinx.serialization, Kotlin |
 | `jsonlens-mapped` | `MappedJson`: a read-only model over UTF-8 bytes, for example a memory-mapped file, with no copies of values | model |
 | `jsonlens-pointer` | `JsonPointer`: RFC 6901 JSON Pointer for the values of any `JsonModel` | model |
 | `jsonlens-patch` | `JsonPatch`: RFC 6902 JSON Patch, applied in place to any editable `JsonModel` | model, pointer |

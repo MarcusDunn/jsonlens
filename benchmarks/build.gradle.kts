@@ -8,9 +8,6 @@ import net.ltgt.gradle.errorprone.errorprone
 
 plugins {
     id("jsonlens.java-conventions")
-    // Kotlin objects for the benchmarks of KotlinxObjectModel.
-    id("jsonlens.kotlin-jvm")
-    id("jsonlens.kotlin-serialization")
 }
 
 description = "JMH benchmarks of jsonlens with large JSON files. It is not published."
@@ -90,7 +87,7 @@ tasks.register<JavaExec>("footprint") {
     val megabytes = providers.gradleProperty("megabytes").orElse("100")
     val results = resultsPath
     val output = label.map { "$results/$it-footprint.txt" }
-    val models = providers.gradleProperty("models").orElse("jackson,kotlinx,kotlinxObjects,mapped")
+    val models = providers.gradleProperty("models").orElse("jackson,kotlinx,mapped")
     argumentProviders.add(CommandLineArgumentProvider { listOf(megabytes.get(), output.get(), models.get()) })
     outputs.upToDateWhen { false }
 }
