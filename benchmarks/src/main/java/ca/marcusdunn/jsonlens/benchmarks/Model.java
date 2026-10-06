@@ -61,9 +61,22 @@ enum Model {
         return valueOf(name.toUpperCase(java.util.Locale.ROOT));
     }
 
+    /// A root, and the nodes that a query selected from it.
+    record Held(Object root, List<?> nodes) {}
+
     /// A loaded document and its model.
     record Loaded<N>(N root, JsonModel<N> model) {
         List<Node<N>> evaluate(JsonPathEvaluator evaluator, JsonPathQuery query) {
+            return evaluate(evaluator, query, root);
+        }
+
+        /// Evaluates a query, and keeps its root, so that the caller can measure what the query
+        /// left reachable from the root, for example the cache of a model.
+        Held hold(JsonPathEvaluator evaluator, JsonPathQuery query) {
+            return new Held(root, evaluate(evaluator, query, root));
+        }
+
+        private List<Node<N>> evaluate(JsonPathEvaluator evaluator, JsonPathQuery query, N root) {
             return switch (evaluator.evaluate(query, root, model)) {
                 case Result.Ok<List<Node<N>>, EvaluationError>(List<Node<N>> nodes) -> nodes;
                 case Result.Err<List<Node<N>>, EvaluationError>(EvaluationError error) ->

@@ -265,7 +265,6 @@ lib/jackson-stream-on-demand   | requirement | jackson   | JacksonStream reads t
 lib/jackson-stream-errors      | requirement | jackson   | A parser error during a query ends the document there and is kept in failure(); open and readFully give errors as values.
 lib/kotlinx-contract           | requirement | kotlinx-serialization | KotlinxJsonModel passes the JsonModel contract tests.
 lib/kotlinx-dependencies       | requirement | kotlinx-serialization | At runtime, the kotlinx-serialization module requires only the model module, kotlinx.serialization JSON, and the Kotlin standard library.
-lib/kotlinx-object-model       | requirement | kotlinx-serialization | KotlinxObjectModel reads Kotlin objects through their serializers, one level at a time. Its view is the JSON of Json.encodeToJsonElement with the same Json instance, in each configuration.
 lib/kotlinx-non-json-literals  | option      | kotlinx-serialization | A JsonPrimitive can hold a literal that is not JSON, for example NaN. Decision: such a primitive is a string with its text.
 lib/mapped-dependencies        | requirement | mapped    | At runtime, the mapped module requires only java.base and the model module. JSpecify is a compile-time (static) requirement only.
 lib/mapped-null-marked         | requirement | mapped    | All exported packages of the mapped module are @NullMarked (JSpecify).

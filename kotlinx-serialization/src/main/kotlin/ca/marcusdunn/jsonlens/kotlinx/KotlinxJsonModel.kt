@@ -32,11 +32,6 @@ import kotlinx.serialization.json.JsonUnquotedLiteral
  */
 public object KotlinxJsonModel : JsonModel<JsonElement>, JsonFactory<JsonElement> {
 
-    private val jsonNumber = Regex("""-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][-+]?[0-9]+)?""")
-
-    /** An integer with at most 18 digits always fits in a long. */
-    private val shortInteger = Regex("""-?(0|[1-9][0-9]{0,17})""")
-
     override fun kind(node: JsonElement): JsonKind = when (node) {
         is JsonObject -> JsonKind.OBJECT
         is JsonArray -> JsonKind.ARRAY
@@ -45,7 +40,7 @@ public object KotlinxJsonModel : JsonModel<JsonElement>, JsonFactory<JsonElement
             node.isString -> JsonKind.STRING
             node.content == "true" -> JsonKind.TRUE
             node.content == "false" -> JsonKind.FALSE
-            jsonNumber.matches(node.content) -> JsonKind.NUMBER
+            numberText(node.content) != NumberText.NONE -> JsonKind.NUMBER
             else -> JsonKind.STRING
         }
     }
@@ -68,9 +63,18 @@ public object KotlinxJsonModel : JsonModel<JsonElement>, JsonFactory<JsonElement
 
     override fun stringValue(string: JsonElement): JsonString = JsonString.of((string as JsonPrimitive).content)
 
+    /**
+     * The number in its cheapest exact form: a `long`, a `double` that has exactly the value of
+     * the text, or the text itself. The first two compare without a conversion.
+     */
     override fun numberValue(number: JsonElement): JsonNumber {
         val text = (number as JsonPrimitive).content
-        return if (shortInteger.matches(text)) JsonNumber.of(text.toLong()) else TextNumber(text)
+        return when (numberText(text)) {
+            NumberText.LONG -> JsonNumber.of(text.toLong())
+            // NumberText.DOUBLE is finite, so the fallback is only for completeness.
+            NumberText.DOUBLE -> JsonNumber.of(text.toDouble()).orElse(TextNumber(text))
+            else -> TextNumber(text)
+        }
     }
 
     override fun string(value: JsonString): JsonElement = JsonPrimitive(JsonString.copyOf(value))

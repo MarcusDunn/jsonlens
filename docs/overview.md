@@ -35,7 +35,7 @@ steps:
 | [ca.marcusdunn.jsonlens.pointer] | [ca.marcusdunn.jsonlens.pointer.JsonPointer]: RFC 6901 JSON Pointer for the values of any model | model |
 | [ca.marcusdunn.jsonlens.patch] | [ca.marcusdunn.jsonlens.patch.JsonPatch]: RFC 6902 JSON Patch, applied in place to any editable model | model, pointer |
 | [ca.marcusdunn.jsonlens.testkit] | Tests for your own model: [ca.marcusdunn.jsonlens.testkit.JsonModelContract], [ca.marcusdunn.jsonlens.testkit.ModelVerifier], and [ca.marcusdunn.jsonlens.testkit.ComplianceKit]. Use it only in tests. | model, path-core, mapped, path-parser, path-evaluator, patch, JUnit Jupiter |
-| [jsonlens-kotlinx-serialization](kotlinx/index.html) (Kotlin) | `KotlinxJsonModel` for kotlinx.serialization `JsonElement` trees, and `KotlinxObjectModel` for `@Serializable` Kotlin objects | model, kotlinx.serialization, Kotlin |
+| [jsonlens-kotlinx-serialization](kotlinx/index.html) (Kotlin) | `KotlinxJsonModel` for kotlinx.serialization `JsonElement` trees | model, kotlinx.serialization, Kotlin |
 
 Javadoc cannot read Kotlin, so the Kotlin module has its own [Dokka pages](kotlinx/index.html).
 Its javadoc JAR has the same pages.
