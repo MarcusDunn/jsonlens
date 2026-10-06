@@ -11,7 +11,7 @@ plugins {
 // The projects that publish an artifact. The BOM gives their versions.
 val publishedProjects = listOf(
     "model", "model-testkit", "path-core", "path-parser", "path-evaluator",
-    "jackson", "kotlinx-serialization", "mapped", "pointer", "patch", "bom",
+    "jackson", "kotlinx-serialization", "mapped", "pointer", "patch", "merge-patch", "bom",
 )
 
 tasks.register<Zip>("centralBundle") {

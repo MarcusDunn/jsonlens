@@ -16,6 +16,7 @@ dependencies {
         api(projects.mapped)
         api(projects.pointer)
         api(projects.patch)
+        api(projects.mergePatch)
         api(projects.modelTestkit)
     }
 }

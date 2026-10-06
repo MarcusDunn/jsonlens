@@ -19,4 +19,4 @@ enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 rootProject.name = "jsonlens"
 
-include("model", "model-testkit", "path-core", "path-parser", "path-evaluator", "jackson", "kotlinx-serialization", "mapped", "pointer", "patch", "bom", "test-support", "docs", "fuzz", "benchmarks")
+include("model", "model-testkit", "path-core", "path-parser", "path-evaluator", "jackson", "kotlinx-serialization", "mapped", "pointer", "patch", "merge-patch", "bom", "test-support", "docs", "fuzz", "benchmarks")

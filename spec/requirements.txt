@@ -338,6 +338,30 @@ lib/patch-minimal-copies       | requirement | patch     | move and test build n
 lib/patch-copy                 | requirement | patch     | applyToCopy applies a patch with only a JsonModel and a JsonFactory (for example kotlinx). The document never changes. Each change builds only the containers on its path; all other nodes are shared, and copy shares its source.
 lib/patch-dependencies         | requirement | patch     | At runtime, the patch module requires only java.base, the model module, and the pointer module.
 lib/patch-null-marked          | requirement | patch     | All exported packages of the patch module are @NullMarked (JSpecify).
+
+# ---------------------------------------------------------------------------------------------
+# RFC 7396: JSON Merge Patch (https://www.rfc-editor.org/info/rfc7396). The merge-patch module owns these rows.
+# ---------------------------------------------------------------------------------------------
+rfc7396-2/document                 | requirement | merge-patch | Each JSON value is a merge patch document: an object, an array, a string, a number, true, false, or null.
+rfc7396-2/replace                  | requirement | merge-patch | A patch that is not an object replaces the whole target. null replaces the target with null.
+rfc7396-2/non-object-target        | requirement | merge-patch | If the patch is an object and the target is not an object, the merge starts from an empty object.
+rfc7396-2/add-replace              | requirement | merge-patch | A patch member with a value that is not null and not an object adds the target member, or replaces its value.
+rfc7396-2/null-removes             | requirement | merge-patch | A patch member with the value null removes the target member. If the target has no such member, nothing changes.
+rfc7396-2/recursive                | requirement | merge-patch | A patch member with an object value merges into the target member by the same rules. If the target member is not an object or is not there, the merge starts from an empty object, so null members of the patch value do not get into the result.
+rfc7396-2/arrays                   | requirement | merge-patch | An array in the patch replaces the target value as a whole. The merge does not merge arrays, and it keeps the null elements and the null members of objects in the array.
+rfc7396-3/example                  | requirement | merge-patch | The example of Section 3 gives its result.
+rfc7396-A/examples                 | requirement | merge-patch | Each example of Appendix A gives its result on the Jackson and the Java collections models, in place and to a copy, with the patch document in Jackson and in the memory-mapped model.
+rfc7396-4/media-type               | declined    | merge-patch | The media type application/merge-patch+json is for transport. The library does not transport patch documents.
+lib/merge-patch-duplicate-names    | option      | merge-patch | RFC 7396 does not tell which value of a duplicate member name applies, and RFC 8259 does not define their meaning. Decision: parse rejects a patch document with a duplicate name in any object, also in an array, with DuplicateName and the location of the object.
+lib/merge-patch-target-duplicates  | option      | merge-patch | If a target object has a member name more than once, the target member that the patch changes is not defined. Decision: if the patch has a member with that name for the object, the merge gives TargetDuplicateName. Other duplicate names have no effect.
+lib/merge-patch-errors             | requirement | merge-patch | Each error is a MergePatchError value with a location. A number of the patch that the target model cannot hold gives ValueNotRepresentable. The library does not throw.
+lib/merge-patch-atomic             | requirement | merge-patch | After an error, the target has its original value: the merge finds all changes before it makes one.
+lib/merge-patch-model-agnostic     | requirement | merge-patch | A patch document can be in any JsonModel, and a target in any model that is also a JsonFactory (and a JsonEditor for apply).
+lib/merge-patch-minimal-copies     | requirement | merge-patch | apply copies each patch value that gets into the result one time, builds no node for a removal or a merge into an object, and never shares a node with the patch document.
+lib/merge-patch-copy               | requirement | merge-patch | applyToCopy merges with only a JsonModel and a JsonFactory (for example kotlinx). The target never changes. It builds only the objects that change and their ancestors, and shares all other nodes. An object patch that changes nothing gives the target itself.
+lib/merge-patch-deep-nesting       | requirement | merge-patch | Deeply nested patch documents and targets do not cause a stack overflow in parse, apply, or applyToCopy.
+lib/merge-patch-dependencies       | requirement | merge-patch | At runtime, the merge-patch module requires only java.base and the model module.
+lib/merge-patch-null-marked        | requirement | merge-patch | All exported packages of the merge-patch module are @NullMarked (JSpecify).
 lib/testkit-dependencies       | requirement | model-testkit | At runtime, the model-testkit module requires the model, core, mapped, parser, evaluator, and patch modules, and JUnit Jupiter. JSpecify is a compile-time (static) requirement only.
 lib/testkit-null-marked        | requirement | model-testkit | All exported packages of the model-testkit module are @NullMarked (JSpecify).
 lib/testkit-verifier           | requirement | model-testkit | ModelVerifier checks each rule of the JsonModel contract on each value of a document, and returns each violation as a value. An override of a default method must give the result of the default method.
