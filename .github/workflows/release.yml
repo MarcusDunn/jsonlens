@@ -1,15 +1,18 @@
-# Builds, signs, and attests a release from a tag "v<version>", and uploads it to Maven Central.
+# Builds, signs, and attests a release from a tag "v<version>", checks it with an independent
+# rebuild, and publishes it to Maven Central.
 #
-# The environment "release" must have required reviewers, and these secrets and variables:
-#   SIGNING_KEY       the ASCII-armored private PGP key for the signatures
-#   SIGNING_PASSWORD  the password of that key
-#   SIGNING_KEY_ID    (a variable, not a secret) the short ID of the signing subkey: the last 8
-#                     hex digits of its fingerprint
-#   CENTRAL_TOKEN     base64 of "<user>:<password>" of a Central Portal user token
-#
-# The upload uses publishingType=USER_MANAGED: the Central Portal checks the bundle, and you
-# release it by hand on central.sonatype.com. The upload job has no Gradle and no project code, so
-# the code of the build never sees the Central token.
+# 1. "Build, sign, and attest" waits for approval in the environment "release", which must have
+#    required reviewers. It holds:
+#      SIGNING_KEY       the ASCII-armored private PGP key for the signatures (secret)
+#      SIGNING_PASSWORD  the password of that key (secret)
+#      SIGNING_KEY_ID    the short ID of the signing subkey: the last 8 hex digits of its
+#                        fingerprint (variable)
+# 2. "Rebuild and compare" builds the tag again on another runner, without secrets, and stops the
+#    release unless each JAR, POM, and module file has the same bytes as in the bundle.
+# 3. "Upload to Maven Central" runs in the environment "central" (no reviewers; v* tags only),
+#    which holds CENTRAL_TOKEN: base64 of "<user>:<password>" of a Central Portal user token. It
+#    uploads with publishingType=AUTOMATIC, and waits until the Portal reports PUBLISHED. It has
+#    no Gradle and no project code, so the code of the build never sees the Central token.
 name: Release
 
 on:
@@ -90,21 +93,65 @@ jobs:
           path: build/central-bundle.zip
           if-no-files-found: error
 
-  upload:
-    name: Upload to Maven Central
+  rebuild:
+    name: Rebuild and compare
     needs: build
     runs-on: ubuntu-24.04
-    environment: release
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check that gradle-wrapper.jar is the official JAR
+        uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+      # No signing key here: the rebuild makes the same artifacts, without signatures.
+      - name: Rebuild the bundle
+        run: nix develop --command ./gradlew --no-build-cache --no-configuration-cache centralBundle
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: central-bundle
+          path: released
+      - name: Compare the rebuild with the bundle of the build job
+        run: .github/scripts/compare-bundles.sh released/central-bundle.zip build/staging-deploy
+
+  upload:
+    name: Upload to Maven Central
+    needs: [build, rebuild]
+    runs-on: ubuntu-24.04
+    environment: central
     permissions: {}
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: central-bundle
-      - name: Upload the bundle to the Central Portal
+      - name: Upload the bundle to the Central Portal, and wait until it is published
         env:
           CENTRAL_TOKEN: ${{ secrets.CENTRAL_TOKEN }}
         run: |
-          curl --fail-with-body --silent --show-error \
+          portal="https://central.sonatype.com/api/v1/publisher"
+          id="$(curl --fail-with-body --silent --show-error \
             --header "Authorization: Bearer ${CENTRAL_TOKEN}" \
             --form bundle=@central-bundle.zip \
-            "https://central.sonatype.com/api/v1/publisher/upload?name=jsonlens-${GITHUB_REF_NAME}&publishingType=USER_MANAGED"
+            "${portal}/upload?name=jsonlens-${GITHUB_REF_NAME}&publishingType=AUTOMATIC")"
+          echo "Deployment ${id}"
+          # Publication takes some minutes; it is usually done within 30.
+          for _ in $(seq 1 90); do
+            status="$(curl --fail-with-body --silent --show-error --request POST \
+              --header "Authorization: Bearer ${CENTRAL_TOKEN}" "${portal}/status?id=${id}")"
+            state="$(jq -r '.deploymentState' <<< "${status}")"
+            echo "$(date -u +%H:%M:%S) ${state}"
+            case "${state}" in
+              PUBLISHED)
+                exit 0
+                ;;
+              FAILED)
+                jq '.errors' <<< "${status}" >&2
+                exit 1
+                ;;
+            esac
+            sleep 60
+          done
+          echo "The deployment ${id} is not published after 90 minutes." >&2
+          exit 1

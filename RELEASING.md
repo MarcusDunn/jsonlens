@@ -41,21 +41,28 @@ The rulesets of the repository allow changes to `main` only through a pull reque
    ```sh
    git tag -a v<version> -m "jsonlens <version>" && git push origin v<version>
    ```
-3. The workflow `release.yml` checks that the tag is the version, checks the release key, builds,
-   signs, and attests the release, and uploads the bundle to the Central Portal. Both of its jobs
-   wait for approval in the environment `release`: approve them in the Actions tab.
-4. On central.sonatype.com, under "Deployments", check the deployment and publish it. Maven Central
-   never deletes or replaces a published version.
-5. In a pull request, set `version` to the next `-SNAPSHOT` version.
+3. Approve the job "Build, sign, and attest" of the workflow `release.yml` in the Actions tab. This
+   is the only approval. Then the workflow runs to the end by itself:
+   - "Build, sign, and attest" checks that the tag is the version and checks the release key. It
+     builds, checks, signs, and attests the release.
+   - "Rebuild and compare" builds the tag again on another runner, without secrets. The release
+     stops unless each JAR, POM, and module file has the same bytes as in the bundle.
+   - "Upload to Maven Central" uploads the bundle with automatic publication, and waits until the
+     Central Portal reports `PUBLISHED`. Maven Central never deletes or replaces a published
+     version. The files are on `repo1.maven.org` some minutes after that.
+4. In a pull request, set `version` to the next `-SNAPSHOT` version.
 
-The environment `release` has required reviewers, and only `v*` tags can deploy to it. It holds:
+Two environments hold the secrets. Only `v*` tags can deploy to them.
 
-| Name | Kind | Value |
-|---|---|---|
-| `SIGNING_KEY` | secret | the signing subkey only, ASCII-armored, protected with `SIGNING_PASSWORD` |
-| `SIGNING_PASSWORD` | secret | a random password that nobody needs to know |
-| `SIGNING_KEY_ID` | variable | `D6F54291`, the short ID of the signing subkey (Gradle does not take the long ID) |
-| `CENTRAL_TOKEN` | secret | base64 of `<user>:<password>` of a Central Portal user token |
+| Environment | Name | Kind | Value |
+|---|---|---|---|
+| `release` (required reviewers) | `SIGNING_KEY` | secret | the signing subkey only, ASCII-armored, protected with `SIGNING_PASSWORD` |
+| `release` | `SIGNING_PASSWORD` | secret | a random password that nobody needs to know |
+| `release` | `SIGNING_KEY_ID` | variable | `D6F54291`, the short ID of the signing subkey (Gradle does not take the long ID) |
+| `central` (no reviewers) | `CENTRAL_TOKEN` | secret | base64 of `<user>:<password>` of a Central Portal user token |
+
+`central` needs no reviewers: its job runs only after the approved build and the successful
+compare, and it runs no project code.
 
 ## The release key
 
