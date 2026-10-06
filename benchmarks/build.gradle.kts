@@ -90,7 +90,7 @@ tasks.register<JavaExec>("footprint") {
     val megabytes = providers.gradleProperty("megabytes").orElse("100")
     val results = resultsPath
     val output = label.map { "$results/$it-footprint.txt" }
-    val models = providers.gradleProperty("models").orElse("jackson,kotlinx,mapped")
+    val models = providers.gradleProperty("models").orElse("jackson,kotlinx,kotlinxObjects,mapped")
     argumentProviders.add(CommandLineArgumentProvider { listOf(megabytes.get(), output.get(), models.get()) })
     outputs.upToDateWhen { false }
 }

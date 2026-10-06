@@ -81,6 +81,9 @@ enum Model {
 
     /// A loaded document and its model. [#root()] gives the root node of an evaluation: the same
     /// node each time, or a new one for a model that caches what a query visits.
+    /// A root, and the nodes that a query selected from it.
+    record Held(Object root, List<?> nodes) {}
+
     record Loaded<N>(Supplier<N> roots, JsonModel<N> model) {
         static <N> Loaded<N> of(N root, JsonModel<N> model) {
             return new Loaded<>(() -> root, model);
@@ -91,7 +94,18 @@ enum Model {
         }
 
         List<Node<N>> evaluate(JsonPathEvaluator evaluator, JsonPathQuery query) {
-            return switch (evaluator.evaluate(query, root(), model)) {
+            return evaluate(evaluator, query, root());
+        }
+
+        /// Evaluates a query, and keeps its root, so that the caller can measure what the query
+        /// left reachable from the root, for example the cache of a model.
+        Held hold(JsonPathEvaluator evaluator, JsonPathQuery query) {
+            N root = root();
+            return new Held(root, evaluate(evaluator, query, root));
+        }
+
+        private List<Node<N>> evaluate(JsonPathEvaluator evaluator, JsonPathQuery query, N root) {
+            return switch (evaluator.evaluate(query, root, model)) {
                 case Result.Ok<List<Node<N>>, EvaluationError>(List<Node<N>> nodes) -> nodes;
                 case Result.Err<List<Node<N>>, EvaluationError>(EvaluationError error) ->
                         throw new IllegalStateException(error.message());

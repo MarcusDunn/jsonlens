@@ -30,7 +30,7 @@ public final class Footprint {
             case Result.Err<JsonPathQuery, ParseError>(ParseError error) -> throw new IllegalStateException(error.message());
         };
         List<String> lines = new ArrayList<>();
-        lines.add(String.format("%-8s %10s %16s %16s", "model", "file MB", "after load MB", "after walk MB"));
+        lines.add(String.format("%-14s %10s %16s %16s", "model", "file MB", "after load MB", "after walk MB"));
         long empty = usedHeap();
         List<Model> models = args.length > 2
                 ? java.util.Arrays.stream(args[2].split(",")).map(Model::of).toList()
@@ -38,9 +38,12 @@ public final class Footprint {
         for (Model model : models) {
             Model.Loaded<?> document = model.load(file);
             long loaded = usedHeap() - empty;
-            int count = document.evaluate(JsonPathEvaluator.standard(), walk).size();
+            // Keep the root of the walk: a model can cache what the walk visited.
+            Model.Held held = document.hold(JsonPathEvaluator.standard(), walk);
             long walked = usedHeap() - empty;
-            lines.add(String.format("%-8s %10d %16.1f %16.1f", model.name().toLowerCase(java.util.Locale.ROOT),
+            int count = held.nodes().size();
+            java.lang.ref.Reference.reachabilityFence(held);
+            lines.add(String.format("%-14s %10d %16.1f %16.1f", model.name().toLowerCase(java.util.Locale.ROOT),
                     megabytes, loaded / 1048576.0, walked / 1048576.0));
             if (count == 0 || document.root() == null) {
                 throw new IllegalStateException("the walk selected no nodes");
