@@ -3,10 +3,10 @@ package ca.marcusdunn.jsonlens.model;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
-import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import org.jspecify.annotations.Nullable;
 
 /// Copies a value of one model into a factory, without recursion.
@@ -38,8 +38,9 @@ final class Copier<S, N> {
         private JsonString name = JsonString.of("");
         /// Tells if the current member has the name of an earlier member.
         private boolean duplicate;
-        /// The names so far, in buckets by hash code: they compare by scalar values, without a decoded copy.
-        private final Map<Integer, List<JsonString>> names = new HashMap<>();
+        /// The names so far, in the order of their scalar values: no decoded copy, and no hash code that
+        /// an attacker can make collide, so each name costs O(log n) comparisons.
+        private final Set<JsonString> names = new TreeSet<>(JsonString::compare);
         private final List<N> elements = new ArrayList<>();
         private final List<Property<N>> copies = new ArrayList<>();
 
@@ -60,11 +61,7 @@ final class Copier<S, N> {
                 return false;
             }
             name = members.name();
-            List<JsonString> bucket = names.computeIfAbsent(JsonString.hash(name), hash -> new ArrayList<>());
-            for (JsonString earlier : bucket) {
-                duplicate |= JsonString.equal(earlier, name);
-            }
-            bucket.add(name);
+            duplicate |= !names.add(name);
             return true;
         }
 

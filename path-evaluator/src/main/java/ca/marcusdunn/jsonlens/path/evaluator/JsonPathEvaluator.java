@@ -68,8 +68,10 @@ public final class JsonPathEvaluator {
     /// @param maxRegexSize the maximum number of program instructions for a regular expression
     public record Limits(int maxNodes, int maxRegexSize) {
 
-        /// 10,000,000 nodes and 10,000 regular expression instructions.
-        public static final Limits DEFAULT = new Limits(10_000_000, 10_000);
+        /// 1,000,000 nodes and 10,000 regular expression instructions. A node of a nodelist uses
+        /// about 80 bytes of heap (measured with the memory-mapped model), so 1,000,000 nodes use
+        /// about 80 MB.
+        public static final Limits DEFAULT = new Limits(1_000_000, 10_000);
     }
 
     private static final JsonPathEvaluator STANDARD = new JsonPathEvaluator(Functions.STANDARD, Limits.DEFAULT);

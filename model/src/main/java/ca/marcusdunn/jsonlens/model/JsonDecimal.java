@@ -117,7 +117,7 @@ public final class JsonDecimal implements Comparable<JsonDecimal> {
             if (i == start) {
                 return Maybe.none();
             }
-            BigInteger value = new BigInteger(written.toString());
+            BigInteger value = DecimalDigits.parse(written);
             exponent = exponent.add(negative ? value.negate() : value);
         }
         if (i != length) {
@@ -186,7 +186,7 @@ public final class JsonDecimal implements Comparable<JsonDecimal> {
         if (scale.bitLength() >= Integer.SIZE) {
             return Maybe.none();
         }
-        BigInteger digits = new BigInteger(significand);
+        BigInteger digits = DecimalDigits.parse(significand);
         return Maybe.some(new BigDecimal(signum == -1 ? digits.negate() : digits, scale.intValue()));
     }
 

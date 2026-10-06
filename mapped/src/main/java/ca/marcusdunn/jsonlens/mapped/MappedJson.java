@@ -42,7 +42,8 @@ import java.nio.file.StandardOpenOption;
 ///
 /// ## Limits and threads
 ///
-/// A `ByteBuffer` has an `int` index, so a file can have at most 2 GiB. The caller must not change
+/// A `ByteBuffer` has an `int` index, so a file can have at most 2 GiB. [Limits] puts limits on the
+/// depth of nesting and on the length of a number. The caller must not change
 /// the bytes while the index is in use. A `MappedJson` and its model are safe for concurrent reads.
 public final class MappedJson {
 
@@ -81,29 +82,57 @@ public final class MappedJson {
         this.children = children;
     }
 
+    /// Limits on the structure of a JSON text, so that a small hostile text cannot use much memory
+    /// or time. The defaults are the defaults of Jackson (`StreamReadConstraints`).
+    ///
+    /// | Limit | Error when the text passes it |
+    /// |---|---|
+    /// | [#maxDepth()] | [MappedJsonError.NestingTooDeep] |
+    /// | [#maxNumberLength()] | [MappedJsonError.NumberTooLong] |
+    ///
+    /// @param maxDepth the maximum number of nested arrays and objects. Each level of nesting
+    ///     uses memory while the index is made, so 40 MB of `[` would use more than 1 GB.
+    /// @param maxNumberLength the maximum number of characters of a number, with its sign,
+    ///     fraction, and exponent. A comparison reads all digits of a number each time.
+    public record Limits(int maxDepth, int maxNumberLength) {
+
+        /// 1000 levels of nesting and 1000 characters for a number.
+        public static final Limits DEFAULT = new Limits(1000, 1000);
+    }
+
+    /// Maps a file that holds a JSON text in UTF-8, with the [Limits#DEFAULT] limits.
+    ///
+    /// @param path the file
+    /// @return the JSON text, or an error if the file cannot be read, is larger than 2 GiB, is not
+    ///     a JSON text in UTF-8, or passes a limit
+    public static Result<MappedJson, MappedJsonError> open(Path path) {
+        return open(path, Limits.DEFAULT);
+    }
+
     /// Maps a file that holds a JSON text in UTF-8.
     ///
     /// @param path the file
-    /// @return the JSON text, or an error if the file cannot be read, is larger than 2 GiB, or is not
-    ///     a JSON text in UTF-8
-    public static Result<MappedJson, MappedJsonError> open(Path path) {
+    /// @param limits the limits on the structure of the text
+    /// @return the JSON text, or an error if the file cannot be read, is larger than 2 GiB, is not
+    ///     a JSON text in UTF-8, or passes a limit
+    public static Result<MappedJson, MappedJsonError> open(Path path, Limits limits) {
         FileChannel channel;
         try {
             channel = FileChannel.open(path, StandardOpenOption.READ);
         } catch (IOException e) {
             return Result.err(new MappedJsonError.IoFailure(e.toString()));
         }
-        return map(channel, MAX_SIZE);
+        return map(channel, MAX_SIZE, limits);
     }
 
     /// Maps the content of an open channel, with a size limit, and closes the channel.
-    static Result<MappedJson, MappedJsonError> map(FileChannel channel, long limit) {
+    static Result<MappedJson, MappedJsonError> map(FileChannel channel, long limit, Limits limits) {
         Result<MappedJson, MappedJsonError> result;
         try {
             long size = channel.size();
             result = size > limit
                     ? Result.err(new MappedJsonError.FileTooLarge(size, limit))
-                    : of(channel.map(FileChannel.MapMode.READ_ONLY, 0, size));
+                    : of(channel.map(FileChannel.MapMode.READ_ONLY, 0, size), limits);
         } catch (IOException e) {
             result = Result.err(new MappedJsonError.IoFailure(e.toString()));
         }
@@ -122,15 +151,28 @@ public final class MappedJson {
         return result;
     }
 
+    /// Uses the bytes from the position to the limit of a buffer as a JSON text in UTF-8, with the
+    /// [Limits#DEFAULT] limits.
+    ///
+    /// The JSON text uses the bytes of the buffer; it does not copy them. The position and the limit
+    /// of the buffer do not change.
+    ///
+    /// @param bytes the bytes of the JSON text
+    /// @return the JSON text, or an error if the bytes are not a JSON text in UTF-8, or pass a limit
+    public static Result<MappedJson, MappedJsonError> of(ByteBuffer bytes) {
+        return of(bytes, Limits.DEFAULT);
+    }
+
     /// Uses the bytes from the position to the limit of a buffer as a JSON text in UTF-8.
     ///
     /// The JSON text uses the bytes of the buffer; it does not copy them. The position and the limit
     /// of the buffer do not change.
     ///
     /// @param bytes the bytes of the JSON text
-    /// @return the JSON text, or an error if the bytes are not a JSON text in UTF-8
-    public static Result<MappedJson, MappedJsonError> of(ByteBuffer bytes) {
-        return Indexer.index(bytes);
+    /// @param limits the limits on the structure of the text
+    /// @return the JSON text, or an error if the bytes are not a JSON text in UTF-8, or pass a limit
+    public static Result<MappedJson, MappedJsonError> of(ByteBuffer bytes, Limits limits) {
+        return Indexer.index(bytes, limits);
     }
 
     /// Returns the root value: the complete JSON text.

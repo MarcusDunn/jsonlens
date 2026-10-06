@@ -272,7 +272,8 @@ lib/mapped-contract            | requirement | mapped    | The model of MappedJs
 lib/mapped-no-copies           | requirement | mapped    | MappedJson does not copy the bytes. Strings and numbers are read from the bytes only when the caller reads them, and member lookup compares the name bytes without a decoded copy.
 lib/mapped-errors-as-values    | requirement | mapped    | MappedJson reports bytes that are not a JSON text in UTF-8, and files that cannot be read, as error values. It does not throw an exception for a non-null argument.
 lib/mapped-rfc8259             | requirement | mapped    | MappedJson accepts exactly the JSON texts of RFC 8259 in well-formed UTF-8 (RFC 3629).
-lib/mapped-deep-nesting        | requirement | mapped    | Deeply nested JSON texts do not cause a stack overflow.
+lib/mapped-deep-nesting        | requirement | mapped    | Deeply nested JSON texts (with a larger maxDepth) do not cause a stack overflow.
+lib/mapped-limits              | requirement | mapped    | MappedJson.Limits limits the depth of nesting (default 1000) and the characters of a number (default 1000), as Jackson does. A text that passes a limit gives NestingTooDeep or NumberTooLong.
 lib/mapped-number-exact        | requirement | mapped    | Each JSON number has the kind NUMBER and its exact value, also with an exponent that a BigDecimal cannot hold.
 lib/mapped-size-limit          | requirement | mapped    | A file larger than 2 GiB gives an error value.
 lib/mapped-duplicate-names     | option      | mapped    | RFC 8259 does not define the meaning of duplicate member names. Decision: member() gives the first member with the name, and members() gives all members in document order.
@@ -336,6 +337,8 @@ lib/patch-test-suite           | requirement | patch     | Each enabled record o
 lib/patch-model-agnostic       | requirement | patch     | A patch document can be in any JsonModel, and a target in any model that is also a JsonFactory and a JsonEditor.
 lib/patch-minimal-copies       | requirement | patch     | move and test build no node. add and replace copy their value once. copy makes one deep copy. remove builds no node.
 lib/patch-copy                 | requirement | patch     | applyToCopy applies a patch with only a JsonModel and a JsonFactory (for example kotlinx). The document never changes. Each change builds only the containers on its path; all other nodes are shared, and copy shares its source.
+lib/patch-copy-limit           | requirement | patch     | The copy operations of one application add at most Limits.maxCopiedNodes nodes together (default 1,000,000). A patch that passes the limit gives CopyLimitExceeded, and the document has its original value.
+lib/patch-rollback-on-throw    | requirement | patch     | When a model throws during apply, the changes are reversed before the exception passes through, so the document has its original value.
 lib/patch-dependencies         | requirement | patch     | At runtime, the patch module requires only java.base, the model module, and the pointer module.
 lib/patch-null-marked          | requirement | patch     | All exported packages of the patch module are @NullMarked (JSpecify).
 

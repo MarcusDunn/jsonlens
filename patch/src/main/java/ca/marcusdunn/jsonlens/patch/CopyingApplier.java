@@ -24,8 +24,8 @@ import java.util.List;
 /// @param <M> the type of the target model
 final class CopyingApplier<P, N, M extends JsonModel<N> & JsonFactory<N>> extends Applier<P, N, M> {
 
-    CopyingApplier(JsonModel<P> patchModel, M model, N root) {
-        super(patchModel, model, root);
+    CopyingApplier(JsonModel<P> patchModel, M model, N root, JsonPatch.Limits limits) {
+        super(patchModel, model, root, limits);
     }
 
     @Override

@@ -1,12 +1,16 @@
 package ca.marcusdunn.jsonlens.patch;
 
 import ca.marcusdunn.jsonlens.model.JsonFactory;
+import ca.marcusdunn.jsonlens.model.JsonKind;
 import ca.marcusdunn.jsonlens.model.JsonModel;
 import ca.marcusdunn.jsonlens.model.JsonString;
 import ca.marcusdunn.jsonlens.model.Maybe;
+import ca.marcusdunn.jsonlens.model.MemberCursor;
 import ca.marcusdunn.jsonlens.model.Result;
 import ca.marcusdunn.jsonlens.pointer.JsonPointer;
 import ca.marcusdunn.jsonlens.pointer.PointerError;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
@@ -28,11 +32,15 @@ abstract sealed class Applier<P, N, M extends JsonModel<N> & JsonFactory<N>> per
     private final JsonModel<P> patchModel;
     final M model;
     N root;
+    private final JsonPatch.Limits limits;
+    /// The number of nodes that the `copy` operations added so far.
+    private int copiedNodes;
 
-    Applier(JsonModel<P> patchModel, M model, N root) {
+    Applier(JsonModel<P> patchModel, M model, N root, JsonPatch.Limits limits) {
         this.patchModel = patchModel;
         this.model = model;
         this.root = root;
+        this.limits = limits;
     }
 
     /// A location in a container: a member name of an object, or an index of an array.
@@ -73,14 +81,20 @@ abstract sealed class Applier<P, N, M extends JsonModel<N> & JsonFactory<N>> per
     // -------------------------------------------------------------------------------------------
 
     final Result<N, PatchError> apply(List<Operation<P>> operations) {
-        for (int index = 0; index < operations.size(); index++) {
-            switch (apply(operations.get(index), index)) {
-                case Maybe.None<PatchError>() -> {}
-                case Maybe.Some<PatchError>(PatchError error) -> {
-                    rollback();
-                    return Result.err(error);
+        try {
+            for (int index = 0; index < operations.size(); index++) {
+                switch (apply(operations.get(index), index)) {
+                    case Maybe.None<PatchError>() -> {}
+                    case Maybe.Some<PatchError>(PatchError error) -> {
+                        rollback();
+                        return Result.err(error);
+                    }
                 }
             }
+        } catch (Throwable thrown) {
+            // A model can throw, for example OutOfMemoryError. The document gets its original value.
+            rollback();
+            throw thrown;
         }
         return Result.ok(root);
     }
@@ -156,10 +170,46 @@ abstract sealed class Applier<P, N, M extends JsonModel<N> & JsonFactory<N>> per
     private Maybe<PatchError> copy(Operation.Copy<P> copy, int index) {
         return switch (copy.from().resolve(root, model)) {
             case Result.Err<N, PointerError>(PointerError error) -> Maybe.some(new PatchError.FromNotFound(index, error));
-            case Result.Ok<N, PointerError>(N value) -> duplicate(value) instanceof Maybe.Some<N>(N duplicate)
-                    ? insert(copy.path(), duplicate, index)
-                    : Maybe.some(new PatchError.ValueNotRepresentable(index));
+            case Result.Ok<N, PointerError>(N value) -> {
+                int nodes = countNodes(value, limits.maxCopiedNodes() - copiedNodes);
+                if (nodes == TOO_MANY) {
+                    yield Maybe.some(new PatchError.CopyLimitExceeded(index, limits.maxCopiedNodes()));
+                }
+                copiedNodes += nodes;
+                yield duplicate(value) instanceof Maybe.Some<N>(N duplicate)
+                        ? insert(copy.path(), duplicate, index)
+                        : Maybe.some(new PatchError.ValueNotRepresentable(index));
+            }
         };
+    }
+
+    /// The result of [#countNodes] for a value with more nodes than the maximum.
+    private static final int TOO_MANY = -1;
+
+    /// Counts the nodes of a value, without recursion, and stops after a maximum.
+    ///
+    /// @return the number of nodes, or [#TOO_MANY] if the value has more nodes than the maximum
+    private int countNodes(N value, int max) {
+        Deque<N> pending = new ArrayDeque<>();
+        pending.push(value);
+        int count = 1;
+        while (count <= max && !pending.isEmpty()) {
+            N node = pending.pop();
+            JsonKind kind = model.kind(node);
+            if (kind == JsonKind.ARRAY) {
+                // A well-formed model gives each element below the length, and no other element.
+                for (int i = 0; count <= max && model.element(node, i) instanceof Maybe.Some<N>(N element); i++) {
+                    pending.push(element);
+                    count++;
+                }
+            } else if (kind == JsonKind.OBJECT) {
+                for (MemberCursor<N> cursor = model.memberCursor(node); count <= max && cursor.next(); ) {
+                    pending.push(cursor.value());
+                    count++;
+                }
+            }
+        }
+        return count <= max ? count : TOO_MANY;
     }
 
     private Maybe<PatchError> test(Operation.Test<P> test, int index) {
