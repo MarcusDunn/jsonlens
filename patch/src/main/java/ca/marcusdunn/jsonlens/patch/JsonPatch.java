@@ -28,7 +28,8 @@ import java.util.List;
 ///
 /// The operations apply in order. If an operation fails, the method returns the [PatchError]
 /// (RFC 6902, Section 5), and the document has its original value. [#apply] reverses the changes
-/// that it made. Because the order of the members of an object is not significant (RFC 8259,
+/// that it made. It also reverses them before an exception or an error from a model passes
+/// through it, for example an `OutOfMemoryError`. Because the order of the members of an object is not significant (RFC 8259,
 /// Section 4), a reversed member can be at a different position in its object. [#applyToCopy]
 /// never changes the document.
 ///
@@ -38,7 +39,8 @@ import java.util.List;
 /// copy, and `test` compares without a copy. `add` and `replace` copy their value once into the
 /// target, so that the target never shares a node with the patch. [#apply] makes one deep copy
 /// for `copy`, so that two locations do not share a node. [#applyToCopy] builds a new container
-/// for each container on a changed path, and shares all other nodes.
+/// for each container on a changed path, and shares all other nodes. [Limits] puts a limit on the
+/// number of nodes that `copy` adds.
 ///
 /// ## Duplicate member names
 ///
@@ -51,12 +53,31 @@ import java.util.List;
 /// @param <P> the node type of the model of the patch document
 public final class JsonPatch<P> {
 
+    /// Resource limits of the application of a patch.
+    ///
+    /// Each `copy` can double the size of the document, so a short patch can make a document of
+    /// billions of nodes. The application counts the nodes that the `copy` operations add. When the
+    /// count passes [#maxCopiedNodes()], the operation fails with [PatchError.CopyLimitExceeded],
+    /// and the document has its original value. The values of `add` and `replace` come from the
+    /// patch document, so the size of the patch document limits them.
+    ///
+    /// @param maxCopiedNodes the maximum number of nodes that all `copy` operations of one
+    ///     application add, together
+    public record Limits(int maxCopiedNodes) {
+
+        /// 1,000,000 copied nodes.
+        public static final Limits DEFAULT = new Limits(1_000_000);
+    }
+
+
     private final List<Operation<P>> operations;
     private final JsonModel<P> model;
+    private final Limits limits;
 
-    private JsonPatch(List<Operation<P>> operations, JsonModel<P> model) {
+    private JsonPatch(List<Operation<P>> operations, JsonModel<P> model, Limits limits) {
         this.operations = operations;
         this.model = model;
+        this.limits = limits;
     }
 
     /// Reads a patch document (RFC 6902, Sections 3 and 4).
@@ -69,7 +90,7 @@ public final class JsonPatch<P> {
     /// @param <P> the node type of the model
     /// @return the patch, or the [PatchError] of the first operation that is not valid
     public static <P> Result<JsonPatch<P>, PatchError> parse(P document, JsonModel<P> model) {
-        return new PatchReader<>(model).read(document).map(operations -> new JsonPatch<>(operations, model));
+        return new PatchReader<>(model).read(document).map(operations -> new JsonPatch<>(operations, model, Limits.DEFAULT));
     }
 
     /// Returns a patch with the given operations.
@@ -79,7 +100,7 @@ public final class JsonPatch<P> {
     /// @param <P> the node type of the model
     /// @return the patch
     public static <P> JsonPatch<P> of(List<Operation<P>> operations, JsonModel<P> model) {
-        return new JsonPatch<>(List.copyOf(operations), model);
+        return new JsonPatch<>(List.copyOf(operations), model, Limits.DEFAULT);
     }
 
     /// Returns the operations.
@@ -96,6 +117,22 @@ public final class JsonPatch<P> {
         return model;
     }
 
+    /// Returns a patch with the same operations and other limits.
+    ///
+    /// @param limits the limits
+    /// @return the patch
+    public JsonPatch<P> withLimits(Limits limits) {
+        return new JsonPatch<>(operations, model, limits);
+    }
+
+    /// Returns the limits of this patch.
+    ///
+    /// @return the limits. A patch from [#parse(Object, JsonModel)] or [#of(List, JsonModel)] has
+    ///     [Limits#DEFAULT].
+    public Limits limits() {
+        return limits;
+    }
+
     /// Applies the patch to a document, in place.
     ///
     /// The method changes the containers of the document through the model. An operation with
@@ -109,7 +146,7 @@ public final class JsonPatch<P> {
     /// @return the root of the changed document, or the [PatchError] of the first operation that
     ///     failed. After an error, the document has its original value.
     public <N, M extends JsonModel<N> & JsonFactory<N> & JsonEditor<N>> Result<N, PatchError> apply(N document, M target) {
-        return new InPlaceApplier<>(model, target, document).apply(operations);
+        return new InPlaceApplier<>(model, target, document, limits).apply(operations);
     }
 
     /// Applies the patch to a copy of a document. The document does not change.
@@ -130,6 +167,6 @@ public final class JsonPatch<P> {
     /// @return the root of the changed copy, or the [PatchError] of the first operation that
     ///     failed
     public <N, M extends JsonModel<N> & JsonFactory<N>> Result<N, PatchError> applyToCopy(N document, M target) {
-        return new CopyingApplier<>(model, target, document).apply(operations);
+        return new CopyingApplier<>(model, target, document, limits).apply(operations);
     }
 }

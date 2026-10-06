@@ -6,17 +6,16 @@ import ca.marcusdunn.jsonlens.model.JsonString;
 import ca.marcusdunn.jsonlens.model.Maybe;
 import ca.marcusdunn.jsonlens.model.MemberCursor;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Deque;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 /// Finds an object with duplicate member names in a patch document, without recursion.
 ///
 /// The finder visits each value of the document one time. For each object, it keeps the names in
-/// buckets by hash code. Thus it compares the names by their scalar values, without a decoded
-/// copy, and the time is linear in the number of members.
+/// a set in the order of their scalar values. Thus it compares the names without a decoded copy,
+/// and with no hash code that an attacker can make collide: each member costs O(log n)
+/// comparisons.
 ///
 /// @param <P> the node type of the model of the document
 final class DuplicateFinder<P> {
@@ -60,16 +59,12 @@ final class DuplicateFinder<P> {
 
     /// Finds a duplicate name in an object, and adds the members to the values to visit.
     private Maybe<MergePatchError> object(Visit<P> visit) {
-        Map<Integer, List<JsonString>> names = new HashMap<>();
+        Set<JsonString> names = new TreeSet<>(JsonString::compare);
         for (MemberCursor<P> cursor = model.memberCursor(visit.node()); cursor.next(); ) {
             JsonString name = cursor.name();
-            List<JsonString> bucket = names.computeIfAbsent(JsonString.hash(name), hash -> new ArrayList<>());
-            for (JsonString earlier : bucket) {
-                if (JsonString.equal(earlier, name)) {
-                    return Maybe.some(new MergePatchError.DuplicateName(visit.at().tokens(), JsonString.copyOf(name)));
-                }
+            if (!names.add(name)) {
+                return Maybe.some(new MergePatchError.DuplicateName(visit.at().tokens(), JsonString.copyOf(name)));
             }
-            bucket.add(name);
             pending.push(new Visit<>(cursor.value(), visit.at().child(name)));
         }
         return Maybe.none();

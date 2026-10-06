@@ -12,6 +12,9 @@ public sealed interface MappedJsonError {
             case InvalidUtf8 e -> "The bytes at byte " + e.offset() + " are not well-formed UTF-8.";
             case FileTooLarge e -> "The file has " + e.size() + " bytes. The maximum is " + e.limit() + " bytes.";
             case IoFailure e -> "The file cannot be read: " + e.reason();
+            case NestingTooDeep e -> "The value at byte " + e.offset() + " is nested more than " + e.limit()
+                    + " levels deep.";
+            case NumberTooLong e -> "The number at byte " + e.offset() + " has more than " + e.limit() + " characters.";
         };
     }
 
@@ -36,4 +39,16 @@ public sealed interface MappedJsonError {
     ///
     /// @param reason a description of the I/O problem
     record IoFailure(String reason) implements MappedJsonError {}
+
+    /// An array or an object is nested deeper than [MappedJson.Limits#maxDepth()].
+    ///
+    /// @param offset the index of the byte that opens the array or object that is too deep
+    /// @param limit the maximum depth
+    record NestingTooDeep(int offset, int limit) implements MappedJsonError {}
+
+    /// A number has more characters than [MappedJson.Limits#maxNumberLength()].
+    ///
+    /// @param offset the index of the first byte of the number
+    /// @param limit the maximum number of characters
+    record NumberTooLong(int offset, int limit) implements MappedJsonError {}
 }

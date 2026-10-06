@@ -22,6 +22,7 @@ import ca.marcusdunn.jsonlens.pointer.PointerError;
 /// | [MoveIntoChild] | `from` is a proper prefix of `path` (Section 4.4) |
 /// | [TestFailed] | the values of a `test` are not equal (Section 4.6) |
 /// | [ValueNotRepresentable] | the target model cannot hold a number of the value, or the value has an object with duplicate member names |
+/// | [CopyLimitExceeded] | the `copy` operations add more nodes than [JsonPatch.Limits#maxCopiedNodes()] |
 public sealed interface PatchError {
 
     /// Returns a description of the error for people.
@@ -46,6 +47,8 @@ public sealed interface PatchError {
             case ValueNotRepresentable e -> "The value of operation " + e.operation()
                     + " cannot be added to the target document: a number is too large for it, or an object has duplicate"
                     + " member names.";
+            case CopyLimitExceeded e -> "Operation " + e.operation() + " copies too many nodes: the copy operations of the"
+                    + " patch add more than " + e.limit() + " nodes.";
         };
     }
 
@@ -125,4 +128,11 @@ public sealed interface PatchError {
     ///
     /// @param operation the index of the operation
     record ValueNotRepresentable(int operation) implements PatchError {}
+
+    /// A `copy` operation passes [JsonPatch.Limits#maxCopiedNodes()]: together with the earlier
+    /// `copy` operations, it adds more nodes than the limit. The document has its original value.
+    ///
+    /// @param operation the index of the operation
+    /// @param limit the limit
+    record CopyLimitExceeded(int operation, int limit) implements PatchError {}
 }

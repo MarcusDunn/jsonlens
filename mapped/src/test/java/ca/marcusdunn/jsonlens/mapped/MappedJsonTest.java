@@ -143,14 +143,15 @@ class MappedJsonTest {
     @Requirement("lib/mapped-deep-nesting")
     void deepNestingDoesNotOverflowTheStack() {
         int depth = 100_000;
-        MappedJson arrays = Json.of("[".repeat(depth) + "1" + "]".repeat(depth));
+        MappedJson.Limits deep = new MappedJson.Limits(depth, 1000);
+        MappedJson arrays = Json.of("[".repeat(depth) + "1" + "]".repeat(depth), deep);
         MappedNode node = arrays.root();
         for (int i = 0; i < depth; i++) {
             assertEquals(1, arrays.model().arrayLength(node));
             node = present(arrays.model().element(node, 0));
         }
         assertEquals(JsonKind.NUMBER, arrays.model().kind(node));
-        MappedJson objects = Json.of("{\"a\":".repeat(depth) + "null" + "}".repeat(depth));
+        MappedJson objects = Json.of("{\"a\":".repeat(depth) + "null" + "}".repeat(depth), deep);
         node = objects.root();
         for (int i = 0; i < depth; i++) {
             node = present(objects.model().member(node, JsonString.of("a")));
@@ -348,7 +349,7 @@ class MappedJsonTest {
                 ((Result.Err<MappedJson, MappedJsonError>) MappedJson.open(directory)).error());
         // An error after the file is open, also when the channel closes.
         assertEquals(Result.err(new MappedJsonError.IoFailure("java.io.IOException: the device failed")),
-                MappedJson.map(new FailingChannel(), MappedJson.MAX_SIZE));
+                MappedJson.map(new FailingChannel(), MappedJson.MAX_SIZE, MappedJson.Limits.DEFAULT));
         // The channel fails when it closes. That does not change the result.
         FileChannel closeFails = new FailingChannel() {
             @Override
@@ -356,7 +357,7 @@ class MappedJsonTest {
                 return 10;
             }
         };
-        assertEquals(Result.err(new MappedJsonError.FileTooLarge(10, 1)), MappedJson.map(closeFails, 1));
+        assertEquals(Result.err(new MappedJsonError.FileTooLarge(10, 1)), MappedJson.map(closeFails, 1, MappedJson.Limits.DEFAULT));
     }
 
     @Test
@@ -364,13 +365,13 @@ class MappedJsonTest {
     void limitsTheFileSize(@TempDir Path directory) throws IOException {
         assertEquals(Integer.MAX_VALUE, MappedJson.MAX_SIZE);
         Path file = Files.writeString(directory.resolve("four.json"), "1234");
-        assertEquals(Result.err(new MappedJsonError.FileTooLarge(4, 3)), MappedJson.map(FileChannel.open(file), 3));
+        assertEquals(Result.err(new MappedJsonError.FileTooLarge(4, 3)), MappedJson.map(FileChannel.open(file), 3, MappedJson.Limits.DEFAULT));
         FileChannel channel = FileChannel.open(file);
-        assertTrue(MappedJson.map(channel, 4).isOk());
+        assertTrue(MappedJson.map(channel, 4, MappedJson.Limits.DEFAULT).isOk());
         // The channel is closed, and the mapping stays valid.
         assertFalse(channel.isOpen());
         FileChannel tooLarge = FileChannel.open(file);
-        MappedJson.map(tooLarge, 3);
+        MappedJson.map(tooLarge, 3, MappedJson.Limits.DEFAULT);
         assertFalse(tooLarge.isOpen());
     }
 

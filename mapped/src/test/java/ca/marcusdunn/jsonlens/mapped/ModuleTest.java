@@ -31,8 +31,11 @@ class ModuleTest {
         assertEquals(
                 Set.of(
                         "ca.marcusdunn.jsonlens.mapped.MappedJson",
+                        "ca.marcusdunn.jsonlens.mapped.MappedJson$Limits",
                         "ca.marcusdunn.jsonlens.mapped.MappedJsonError",
                         "ca.marcusdunn.jsonlens.mapped.MappedJsonError$FileTooLarge",
+                        "ca.marcusdunn.jsonlens.mapped.MappedJsonError$NestingTooDeep",
+                        "ca.marcusdunn.jsonlens.mapped.MappedJsonError$NumberTooLong",
                         "ca.marcusdunn.jsonlens.mapped.MappedJsonError$InvalidJson",
                         "ca.marcusdunn.jsonlens.mapped.MappedJsonError$InvalidUtf8",
                         "ca.marcusdunn.jsonlens.mapped.MappedJsonError$IoFailure",

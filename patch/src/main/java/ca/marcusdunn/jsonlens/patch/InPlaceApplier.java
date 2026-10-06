@@ -25,8 +25,8 @@ final class InPlaceApplier<P, N, M extends JsonModel<N> & JsonFactory<N> & JsonE
 
     private final Deque<Runnable> undo = new ArrayDeque<>();
 
-    InPlaceApplier(JsonModel<P> patchModel, M model, N root) {
-        super(patchModel, model, root);
+    InPlaceApplier(JsonModel<P> patchModel, M model, N root, JsonPatch.Limits limits) {
+        super(patchModel, model, root, limits);
     }
 
     @Override

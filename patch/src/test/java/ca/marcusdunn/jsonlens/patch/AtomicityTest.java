@@ -3,12 +3,18 @@ package ca.marcusdunn.jsonlens.patch;
 import static ca.marcusdunn.jsonlens.patch.OperationsTest.patch;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import ca.marcusdunn.jsonlens.jackson.JacksonJsonModel;
 import ca.marcusdunn.jsonlens.model.JsonEditor;
 import ca.marcusdunn.jsonlens.model.JsonFactory;
+import ca.marcusdunn.jsonlens.model.JsonKind;
 import ca.marcusdunn.jsonlens.model.JsonModel;
+import ca.marcusdunn.jsonlens.model.JsonNumber;
+import ca.marcusdunn.jsonlens.model.JsonString;
+import ca.marcusdunn.jsonlens.model.Maybe;
+import ca.marcusdunn.jsonlens.model.MemberCursor;
 import ca.marcusdunn.jsonlens.model.Result;
 import ca.marcusdunn.jsonlens.testing.JavaCollectionsModel;
 import ca.marcusdunn.jsonlens.testsupport.Requirement;
@@ -71,5 +77,59 @@ class AtomicityTest {
                 [{"op": "replace", "path": "/o/a", "value": 42},
                  {"op": "test", "path": "/o/a", "value": "C"}]""").apply(document, JacksonJsonModel.INSTANCE));
         assertTrue(JacksonJsonModel.INSTANCE.equal(Documents.jackson(DOCUMENT), document));
+    }
+
+    /// The Jackson model, but `kind` throws for the string "boom".
+    private static final class ThrowingModel implements JsonModel<JsonNode> {
+        @Override
+        public JsonKind kind(JsonNode node) {
+            if (node.isString() && node.asString().equals("boom")) {
+                throw new IllegalStateException("boom");
+            }
+            return JacksonJsonModel.INSTANCE.kind(node);
+        }
+
+        @Override
+        public int arrayLength(JsonNode array) {
+            return JacksonJsonModel.INSTANCE.arrayLength(array);
+        }
+
+        @Override
+        public Maybe<JsonNode> element(JsonNode array, int index) {
+            return JacksonJsonModel.INSTANCE.element(array, index);
+        }
+
+        @Override
+        public MemberCursor<JsonNode> memberCursor(JsonNode object) {
+            return JacksonJsonModel.INSTANCE.memberCursor(object);
+        }
+
+        @Override
+        public JsonString stringValue(JsonNode string) {
+            return JacksonJsonModel.INSTANCE.stringValue(string);
+        }
+
+        @Override
+        public JsonNumber numberValue(JsonNode number) {
+            return JacksonJsonModel.INSTANCE.numberValue(number);
+        }
+    }
+
+    @Test
+    @Requirement("lib/patch-rollback-on-throw")
+    void anExceptionFromAModelRestoresTheDocument() {
+        JsonNode document = Documents.jackson(DOCUMENT);
+        List<Operation<JsonNode>> operations = patch("""
+                [{"op": "add", "path": "/o/new", "value": 1},
+                 {"op": "replace", "path": "/o/a", "value": 5},
+                 {"op": "remove", "path": "/keep"},
+                 {"op": "add", "path": "/x", "value": "boom"}]""").operations();
+        JsonPatch<JsonNode> throwing = JsonPatch.of(operations, new ThrowingModel());
+        IllegalStateException thrown = assertThrows(IllegalStateException.class,
+                () -> throwing.apply(document, JacksonJsonModel.INSTANCE));
+        assertEquals("boom", thrown.getMessage());
+        assertEquals(Documents.jackson(DOCUMENT), document);
+        assertThrows(IllegalStateException.class, () -> throwing.applyToCopy(document, JacksonJsonModel.INSTANCE));
+        assertEquals(Documents.jackson(DOCUMENT), document);
     }
 }

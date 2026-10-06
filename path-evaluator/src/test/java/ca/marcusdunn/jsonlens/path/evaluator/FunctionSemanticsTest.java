@@ -319,6 +319,18 @@ class FunctionSemanticsTest {
     }
 
     @Test
+    @Requirement("4.1/regex-resources")
+    void patternsFromTheDocumentCanChangeForEachNode() {
+        // The evaluation keeps only the last pattern of each call: each change compiles
+        // the new pattern.
+        String json = "[{\"s\": \"a\", \"re\": \"a\"}, {\"s\": \"b\", \"re\": \"b\"}, {\"s\": \"a\", \"re\": \"b\"},"
+                + " {\"s\": \"b\", \"re\": \"b\"}, {\"s\": \"a\", \"re\": \"a\"}, {\"s\": \"(\", \"re\": \"(\"}]";
+        assertEquals(List.of("$[0]", "$[1]", "$[3]", "$[4]"), paths(json, "$[?match(@.s, @.re)]"));
+        assertEquals(List.of("$[0]", "$[4]"), paths(json, "$[?match(@.s, @.re) && match(@.s, 'a')]"));
+        assertEquals(List.of("$[1]", "$[3]"), paths(json, "$[?search(@.s, @.re) && search(@.re, 'b')]"));
+    }
+
+    @Test
     @Requirement("2.4.7/non-string")
     void searchOfOtherValuesIsFalse() {
         String json = "[1, [\"a\"], \"a\"]";

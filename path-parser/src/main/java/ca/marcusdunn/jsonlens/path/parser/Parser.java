@@ -635,13 +635,12 @@ final class Parser {
             }
         }
         String number = text.substring(start, pos);
-        try {
-            return new Literal.NumberLiteral(new BigDecimal(number));
-        } catch (NumberFormatException e) {
-            // Only an exponent outside the int range causes this: the text agrees with the grammar.
-            fail(new ParseError.NumberOutOfRange(start, number));
-            return null;
+        if (NumberLiterals.value(number) instanceof Maybe.Some<BigDecimal>(BigDecimal value)) {
+            return new Literal.NumberLiteral(value);
         }
+        // Only a scale outside the int range causes this: the text agrees with the grammar.
+        fail(new ParseError.NumberOutOfRange(start, number));
+        return null;
     }
 
     /** function-expr = function-name "(" S [function-argument *(S "," S function-argument)] S ")" */

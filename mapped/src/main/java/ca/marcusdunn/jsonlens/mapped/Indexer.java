@@ -52,21 +52,23 @@ final class Indexer {
     private final IntList children = new IntList();
     /// The entries of the children of the open containers: the innermost container last.
     private final IntList pending = new IntList();
-    private MappedJsonError.@Nullable InvalidJson error;
+    private final MappedJson.Limits limits;
+    private @Nullable MappedJsonError error;
 
-    private Indexer(ByteBuffer data) {
+    private Indexer(ByteBuffer data, MappedJson.Limits limits) {
         this.data = data;
         this.length = data.limit();
+        this.limits = limits;
     }
 
     /// Indexes the bytes from the position to the limit of a buffer.
-    static Result<MappedJson, MappedJsonError> index(ByteBuffer bytes) {
+    static Result<MappedJson, MappedJsonError> index(ByteBuffer bytes, MappedJson.Limits limits) {
         ByteBuffer data = bytes.slice();
         int invalid = firstInvalidUtf8(data);
         if (invalid != END) {
             return Result.err(new MappedJsonError.InvalidUtf8(invalid));
         }
-        Indexer indexer = new Indexer(data);
+        Indexer indexer = new Indexer(data, limits);
         if (!indexer.run()) {
             // Each method that returns false records the error first.
             return Result.err(Objects.requireNonNull(indexer.error));
@@ -107,6 +109,10 @@ final class Indexer {
             if (state == State.VALUE) {
                 int c = at(pos);
                 if (c == '{' || c == '[') {
+                    if (stack.size() == limits.maxDepth()) {
+                        error = new MappedJsonError.NestingTooDeep(pos, limits.maxDepth());
+                        return false;
+                    }
                     boolean object = c == '{';
                     stack.push(new Frame(add(object ? MappedJson.OBJECT : MappedJson.ARRAY, stack, name), object, pending.size()));
                     pos++;
@@ -296,6 +302,7 @@ final class Indexer {
 
     /// A number at the position: `-? (0 / [1-9][0-9]*) ("." [0-9]+)? ([eE] [-+]? [0-9]+)?`.
     private boolean number() {
+        int start = pos;
         if (at(pos) == '-') {
             pos++;
         }
@@ -323,6 +330,10 @@ final class Indexer {
                 fail(pos, "a digit");
                 return false;
             }
+        }
+        if (pos - start > limits.maxNumberLength()) {
+            error = new MappedJsonError.NumberTooLong(start, limits.maxNumberLength());
+            return false;
         }
         return true;
     }

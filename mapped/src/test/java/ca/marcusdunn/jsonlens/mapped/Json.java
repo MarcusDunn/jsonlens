@@ -22,6 +22,13 @@ final class Json {
         return of(text.getBytes(StandardCharsets.UTF_8));
     }
 
+    static MappedJson of(String text, MappedJson.Limits limits) {
+        return switch (MappedJson.of(ByteBuffer.wrap(text.getBytes(StandardCharsets.UTF_8)), limits)) {
+            case Result.Ok<MappedJson, MappedJsonError>(MappedJson json) -> json;
+            case Result.Err<MappedJson, MappedJsonError>(MappedJsonError error) -> fail(error.message());
+        };
+    }
+
     static MappedJsonError error(byte[] bytes) {
         return switch (MappedJson.of(ByteBuffer.wrap(bytes))) {
             case Result.Ok<MappedJson, MappedJsonError>(MappedJson json) -> fail("expected an error");

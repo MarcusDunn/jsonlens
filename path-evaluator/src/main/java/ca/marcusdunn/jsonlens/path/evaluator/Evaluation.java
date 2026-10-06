@@ -28,10 +28,8 @@ import ca.marcusdunn.jsonlens.path.evaluator.iregexp.IRegexp;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
-import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
@@ -50,7 +48,12 @@ final class Evaluation<N> {
     private final Functions functions;
     private final @Nullable Building<N> building;
     private final JsonPathEvaluator.Limits limits;
-    private final Map<String, Result<IRegexp, IRegexp.Problem>> regexps = new HashMap<>();
+    /**
+     * The last compiled regexp of each call of match() and search() in the query. A literal pattern
+     * is compiled once. A pattern from the document can be different for each node, so the
+     * evaluation keeps only the last one of each call: the query limits the memory.
+     */
+    private final IdentityHashMap<FunctionCall, CompiledRegexp> regexps = new IdentityHashMap<>();
     /** The value of each literal of the query. A literal is converted once, not for each node. */
     private @Nullable IdentityHashMap<Literal, Val<N>> literals;
     private @Nullable EvaluationError error;
@@ -503,8 +506,8 @@ final class Evaluation<N> {
     /** A call of a function with the result type LogicalType. */
     private boolean logicalCall(FunctionCall.Logical call, Node<N> current) {
         return switch (call.name()) {
-            case "match" -> regexp(valueArgument(call, 0, current), valueArgument(call, 1, current), true);
-            case "search" -> regexp(valueArgument(call, 0, current), valueArgument(call, 1, current), false);
+            case "match" -> regexp(call, current, true);
+            case "search" -> regexp(call, current, false);
             default -> {
                 if (extension(call, current) instanceof Instance.LogicalInstance<N> result) {
                     yield result.value();
@@ -589,14 +592,18 @@ final class Evaluation<N> {
     }
 
     /** match() and search() (Sections 2.4.6 and 2.4.7). */
-    private boolean regexp(Val<N> input, Val<N> pattern, boolean full) {
-        if (!(operand(input) instanceof Text<N> text) || !(operand(pattern) instanceof Text<N> regex)) {
+    private boolean regexp(FunctionCall.Logical call, Node<N> current, boolean full) {
+        if (!(operand(valueArgument(call, 0, current)) instanceof Text<N> text)
+                || !(operand(valueArgument(call, 1, current)) instanceof Text<N> regex)) {
             return false;
         }
         String source = JsonString.copyOf(regex.value());
-        Result<IRegexp, IRegexp.Problem> compiled =
-                regexps.computeIfAbsent(source, r -> IRegexp.compile(r, limits.maxRegexSize()));
-        return switch (compiled) {
+        CompiledRegexp compiled = regexps.get(call);
+        if (compiled == null || !compiled.source().equals(source)) {
+            compiled = new CompiledRegexp(source, IRegexp.compile(source, limits.maxRegexSize()));
+            regexps.put(call, compiled);
+        }
+        return switch (compiled.result()) {
             case Result.Ok<IRegexp, IRegexp.Problem>(IRegexp regexp) -> full
                     ? regexp.matches(text.value().scalarValues())
                     : regexp.find(text.value().scalarValues());
@@ -608,6 +615,9 @@ final class Evaluation<N> {
             }
         };
     }
+
+    /** A source and its compiled regexp. */
+    private record CompiledRegexp(String source, Result<IRegexp, IRegexp.Problem> result) {}
 
     private void fail(EvaluationError e) {
         if (error == null) {

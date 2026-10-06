@@ -32,6 +32,7 @@ class ModuleTest {
         assertEquals(
                 Set.of(
                         "ca.marcusdunn.jsonlens.patch.JsonPatch",
+                        "ca.marcusdunn.jsonlens.patch.JsonPatch$Limits",
                         "ca.marcusdunn.jsonlens.patch.Operation",
                         "ca.marcusdunn.jsonlens.patch.Operation$Add",
                         "ca.marcusdunn.jsonlens.patch.Operation$Copy",
@@ -40,6 +41,7 @@ class ModuleTest {
                         "ca.marcusdunn.jsonlens.patch.Operation$Replace",
                         "ca.marcusdunn.jsonlens.patch.Operation$Test",
                         "ca.marcusdunn.jsonlens.patch.PatchError",
+                        "ca.marcusdunn.jsonlens.patch.PatchError$CopyLimitExceeded",
                         "ca.marcusdunn.jsonlens.patch.PatchError$DuplicateMember",
                         "ca.marcusdunn.jsonlens.patch.PatchError$FromNotFound",
                         "ca.marcusdunn.jsonlens.patch.PatchError$InvalidPointer",
