@@ -39,7 +39,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Check that gradle-wrapper.jar is the official JAR
-        uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
       - name: Check that the tag is the version of the build
         run: |
@@ -104,7 +104,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Check that gradle-wrapper.jar is the official JAR
-        uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
       # No signing key here: the rebuild makes the same artifacts, without signatures.
       - name: Rebuild the bundle
